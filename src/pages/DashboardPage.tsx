@@ -10,9 +10,14 @@ import {
   CheckCircle2,
   Calendar,
   Shield,
+  ShieldCheck,
   FileSpreadsheet,
   ArrowRight,
   Info,
+  Mail,
+  Phone,
+  Edit3,
+  Sparkles,
 } from 'lucide-react';
 import { NavTab } from '../components/Sidebar';
 
@@ -32,6 +37,7 @@ export const DashboardPage: React.FC<Props> = ({
   onOpenAuthModal,
 }) => {
   const students = appState.students;
+  const groups = appState.groups;
   const incidents = appState.incidents;
   const rewards = appState.rewards;
   const pendingRules = appState.pendingRules;
@@ -200,6 +206,193 @@ export const DashboardPage: React.FC<Props> = ({
           <div className="text-[11px] text-slate-500 mt-1 flex items-center justify-between">
             <span className="truncate">Hiệu lực điểm = 0</span>
             <ArrowRight className="w-3.5 h-3.5 text-slate-400 shrink-0 ml-1" />
+          </div>
+        </div>
+      </div>
+
+      {/* BAN CÁN SỰ & ĐIỀU HÀNH LỚP 10A16 (CÔNG KHAI) */}
+      <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 bg-blue-50 text-blue-700 rounded-xl">
+              <ShieldCheck className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="font-black text-sm sm:text-base text-slate-900 tracking-tight">
+                  Ban Cán Sự & Nhân Sự Điều Hành {classInfo.class_name}
+                </h3>
+                <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-blue-100 text-blue-800">
+                  Chính thức {classInfo.academic_year}
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Cập nhật đồng bộ tức thời từ GVCN • Công khai cho toàn thể học sinh và phụ huynh
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => onNavigate('class_info')}
+              className="px-3.5 py-1.5 text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white rounded-xl shadow-xs transition active:scale-95 cursor-pointer flex items-center gap-1.5"
+            >
+              <Edit3 className="w-3.5 h-3.5" />
+              <span>{canManageClass ? 'Quản lý & Điều chỉnh' : 'Xem chi tiết lớp'}</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Officers Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {/* GVCN */}
+          <div className="p-3.5 bg-gradient-to-br from-blue-50 to-indigo-50/40 rounded-xl border border-blue-200 flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-blue-700">
+                  Giáo viên Chủ nhiệm (GVCN)
+                </span>
+                <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-blue-600 text-white shadow-xs">
+                  Toàn quyền
+                </span>
+              </div>
+              <div className="font-black text-slate-900 text-sm sm:text-base">{classInfo.gvcn_name}</div>
+              <div className="text-[11px] text-slate-600 mt-1 space-y-0.5 font-mono">
+                <div className="flex items-center gap-1.5 truncate">
+                  <Mail className="w-3 h-3 text-blue-600 shrink-0" />
+                  <span className="truncate">{classInfo.gvcn_email}</span>
+                </div>
+                {classInfo.gvcn_phone && (
+                  <div className="flex items-center gap-1.5">
+                    <Phone className="w-3 h-3 text-emerald-600 shrink-0" />
+                    <span>{classInfo.gvcn_phone}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="text-[10px] text-blue-800/80 font-medium mt-2 pt-2 border-t border-blue-200/60">
+              Chỉ đạo toàn diện nề nếp & giáo dục
+            </div>
+          </div>
+
+          {/* Lớp trưởng */}
+          <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-600">
+                  Lớp trưởng
+                </span>
+                <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800">
+                  Ban Cán Sự
+                </span>
+              </div>
+              <div className="font-black text-slate-900 text-sm sm:text-base">
+                {classInfo.class_president_name}
+              </div>
+              <p className="text-[11px] text-slate-500 mt-1">
+                Điều hành chung mọi hoạt động lớp, tổng hợp báo cáo GVCN
+              </p>
+            </div>
+            <div className="text-[10px] text-slate-400 font-medium mt-2 pt-2 border-t border-slate-200">
+              Quyền hạn: Phê duyệt sự việc & chấm nề nếp
+            </div>
+          </div>
+
+          {/* Lớp phó Kỷ luật */}
+          <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-rose-600">
+                  Lớp phó Kỷ luật & Nề nếp
+                </span>
+                <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800">
+                  Ban Cán Sự
+                </span>
+              </div>
+              <div className="font-black text-slate-900 text-sm sm:text-base">
+                {classInfo.class_vice_discipline_name}
+              </div>
+              <p className="text-[11px] text-slate-500 mt-1">
+                Theo dõi điểm danh, ghi nhận vi phạm QĐ 525, tính điểm tuần
+              </p>
+            </div>
+            <div className="text-[10px] text-rose-500 font-medium mt-2 pt-2 border-t border-slate-200">
+              Quyền hạn: Thẩm tra vi phạm & chốt hiệu lực
+            </div>
+          </div>
+
+          {/* Lớp phó Học tập */}
+          <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-indigo-600">
+                  Lớp phó Học tập
+                </span>
+                <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700">
+                  Học vụ
+                </span>
+              </div>
+              <div className="font-black text-slate-900 text-sm sm:text-base">
+                {classInfo.class_vice_academic_name}
+              </div>
+              <p className="text-[11px] text-slate-500 mt-1">
+                Quản lý sổ đầu bài, đôn đốc bài vở 15 phút đầu giờ
+              </p>
+            </div>
+            <div className="text-[10px] text-indigo-500 font-medium mt-2 pt-2 border-t border-slate-200">
+              Đôn đốc chuẩn bị bài trước tiết học
+            </div>
+          </div>
+
+          {/* Bí thư */}
+          <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-amber-700">
+                  Bí thư Chi đoàn
+                </span>
+                <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-amber-50 text-amber-800">
+                  Đoàn TN
+                </span>
+              </div>
+              <div className="font-black text-slate-900 text-sm sm:text-base">
+                {classInfo.secretary_name}
+              </div>
+              <p className="text-[11px] text-slate-500 mt-1">
+                Phong trào Đoàn TNCS, hoạt động tình nguyện & báo tường
+              </p>
+            </div>
+            <div className="text-[10px] text-amber-600 font-medium mt-2 pt-2 border-t border-slate-200">
+              Triển khai các phong trào thi đua
+            </div>
+          </div>
+
+          {/* 4 Tổ trưởng */}
+          <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-600">
+                  4 Tổ trưởng Tự quản
+                </span>
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-slate-200 text-slate-700">
+                  Tổ 1–4
+                </span>
+              </div>
+              <div className="space-y-1 text-xs mt-1">
+                {groups.map((g) => {
+                  const leader = students.find((s) => s.id === g.leader_student_id);
+                  return (
+                    <div key={g.id} className="flex items-center justify-between py-0.5 border-b border-slate-200/60 last:border-0">
+                      <span className="font-semibold text-slate-600">Tổ {g.group_number}:</span>
+                      <span className="font-bold text-slate-900">{leader ? leader.full_name : 'Chưa gán'}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="text-[10px] text-slate-400 font-medium mt-1 pt-1.5 border-t border-slate-200">
+              Chấm chéo nề nếp tổ sinh hoạt hàng ngày
+            </div>
           </div>
         </div>
       </div>

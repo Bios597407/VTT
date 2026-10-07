@@ -125,7 +125,7 @@ export const ReportsPage: React.FC = () => {
               BIÊN BẢN ĐÁNH GIÁ KẾT QUẢ RÈN LUYỆN VÀ NỀ NẾP TUẦN
             </h2>
             <div className="text-xs text-slate-600 italic">
-              Năm học 2026–2027 • Giáo viên chủ nhiệm: Thầy Trần Duy Tân
+              Năm học {appState.classInfo.academic_year} • Giáo viên chủ nhiệm: {appState.classInfo.gvcn_name}
             </div>
           </div>
 
@@ -172,7 +172,7 @@ export const ReportsPage: React.FC = () => {
               <div>ĐẠI DIỆN BAN CÁN SỰ LỚP</div>
               <div className="text-[11px] text-slate-500 mt-0.5">(Ký và ghi rõ họ tên)</div>
               <div className="h-16"></div>
-              <div>Lớp trưởng</div>
+              <div>{appState.classInfo.class_president_name || 'Lớp trưởng'}</div>
             </div>
 
             <div className="text-center">
@@ -180,7 +180,7 @@ export const ReportsPage: React.FC = () => {
               <div className="font-bold mt-1">GIÁO VIÊN CHỦ NHIỆM</div>
               <div className="text-[11px] text-slate-500 mt-0.5">(Ký và ghi rõ họ tên)</div>
               <div className="h-16"></div>
-              <div>Thầy Trần Duy Tân</div>
+              <div>{appState.classInfo.gvcn_name || 'Thầy Trần Duy Tân'}</div>
             </div>
           </div>
         </div>

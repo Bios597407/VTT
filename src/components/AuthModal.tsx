@@ -320,7 +320,8 @@ export const AuthModal: React.FC<Props> = ({ isOpen, onClose, promptMessage, onS
                         : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
                     }`}
                   >
-                    Thầy Tân (GVCN)
+                    <div className="truncate">{classInfo.gvcn_name.split(' ').slice(-2).join(' ') || 'GVCN'}</div>
+                    <div className="text-[10px] opacity-75 font-normal">(GVCN)</div>
                   </button>
 
                   <button
@@ -332,7 +333,8 @@ export const AuthModal: React.FC<Props> = ({ isOpen, onClose, promptMessage, onS
                         : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
                     }`}
                   >
-                    Đức Anh (Lớp trưởng)
+                    <div className="truncate">{classInfo.class_president_name.split(' ').slice(-2).join(' ') || 'Lớp trưởng'}</div>
+                    <div className="text-[10px] opacity-75 font-normal">(Lớp trưởng)</div>
                   </button>
 
                   <button
@@ -344,7 +346,8 @@ export const AuthModal: React.FC<Props> = ({ isOpen, onClose, promptMessage, onS
                         : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
                     }`}
                   >
-                    Thiên Bảo (Lớp phó)
+                    <div className="truncate">{classInfo.class_vice_discipline_name.split(' ').slice(-2).join(' ') || 'Lớp phó'}</div>
+                    <div className="text-[10px] opacity-75 font-normal">(Lớp phó)</div>
                   </button>
                 </div>
               </div>

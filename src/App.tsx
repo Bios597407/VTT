@@ -60,7 +60,6 @@ export function App() {
   const unresolvedRulesCount = appState.pendingRules.filter((r) => r.status === 'unresolved').length;
 
   const RESTRICTED_TABS: Record<string, { label: string; minRole: 'officer' | 'gvcn' }> = {
-    class_info: { label: 'Quản lý Lớp & Ban cán sự', minRole: 'officer' },
     pending_rules: { label: '9 Quy tắc chờ GVCN', minRole: 'officer' },
     period_locks: { label: 'Khóa / Mở kỳ đánh giá', minRole: 'officer' },
     audit: { label: 'Nhật ký kiểm toán', minRole: 'officer' },

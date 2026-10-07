@@ -154,7 +154,7 @@ export const StudentsPage: React.FC = () => {
             )}
           </div>
           <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5">
-            Trường THPT Võ Trường Toản • Năm học 2026–2027 • GVCN: Thầy Trần Duy Tân
+            {appState.classInfo.school_name} • Năm học {appState.classInfo.academic_year} • GVCN: {appState.classInfo.gvcn_name}
           </p>
         </div>
 

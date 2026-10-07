@@ -40,7 +40,7 @@ export const SettingsPage: React.FC = () => {
           Khu vực Bảo mật Tuyệt đối (Chỉ GVCN)
         </h2>
         <p className="text-xs text-slate-600 leading-relaxed">
-          Trang Cài đặt Hệ thống, Phân quyền Gmail cán sự và Cấu hình Cơ sở dữ liệu chỉ dành riêng cho Giáo viên Chủ nhiệm (Thầy Trần Duy Tân). Học sinh và Cán sự không có quyền truy cập mục này.
+          Trang Cài đặt Hệ thống, Phân quyền Gmail cán sự và Cấu hình Cơ sở dữ liệu chỉ dành riêng cho Giáo viên Chủ nhiệm ({appState.classInfo.gvcn_name}). Học sinh và Cán sự không có quyền truy cập mục này.
         </p>
       </div>
     );

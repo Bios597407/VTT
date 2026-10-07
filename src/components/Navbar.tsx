@@ -61,11 +61,11 @@ export const Navbar: React.FC<Props> = ({
                     NỀ NẾP LỚP 10
                   </span>
                   <span className="text-[11px] font-bold text-blue-400 font-mono tracking-wider hidden xs:inline">
-                    · 10A16
+                    · {appState.classInfo.class_name}
                   </span>
                 </div>
                 <p className="text-[11px] text-slate-400 hidden sm:block truncate">
-                  THPT Võ Trường Toản · 2026–2027 · GVCN: Thầy Trần Duy Tân
+                  {appState.classInfo.school_name} · {appState.classInfo.academic_year} · GVCN: {appState.classInfo.gvcn_name}
                 </p>
               </div>
             </div>

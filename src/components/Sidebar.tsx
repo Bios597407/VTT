@@ -148,7 +148,6 @@ export const Sidebar: React.FC<Props> = ({
               const isOfficer = appState.currentUser.isAuthenticatedOfficer;
               const isGvcn = appState.currentUser.role === 'gvcn';
               const isRestricted =
-                item.id === 'class_info' ||
                 item.id === 'pending_rules' ||
                 item.id === 'period_locks' ||
                 item.id === 'audit' ||

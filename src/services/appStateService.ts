@@ -222,6 +222,37 @@ class AppStateService {
     this.initDefaultSeats();
     this.calculateAllWeeklyScores(1);
 
+    // Phục hồi dữ liệu cấu hình Lớp & Ban cán sự từ bộ nhớ trình duyệt nếu có
+    if (typeof window !== 'undefined') {
+      try {
+        const savedClassInfo = localStorage.getItem('VTT_CLASS_INFO');
+        if (savedClassInfo) {
+          const parsed = JSON.parse(savedClassInfo);
+          if (parsed && typeof parsed === 'object') {
+            this.classInfo = { ...this.classInfo, ...parsed };
+          }
+        }
+
+        const savedOfficers = localStorage.getItem('VTT_OFFICER_ACCOUNTS');
+        if (savedOfficers) {
+          const parsed = JSON.parse(savedOfficers);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            this.officerAccounts = parsed;
+          }
+        }
+
+        const savedGroups = localStorage.getItem('VTT_GROUPS');
+        if (savedGroups) {
+          const parsed = JSON.parse(savedGroups);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            this.groups = parsed;
+          }
+        }
+      } catch (e) {
+        console.warn('Lỗi đọc dữ liệu lớp từ localStorage:', e);
+      }
+    }
+
     // BẢO MẬT: Mặc định luôn là Học sinh (Chỉ xem).
     // Chỉ phục hồi quyền Cán sự nếu có phiên làm việc đã xác thực trong localStorage.
     if (typeof window !== 'undefined') {
@@ -294,18 +325,20 @@ class AppStateService {
       const gvcnAcc = this.officerAccounts.find((a) => a.role === 'gvcn');
       this.currentUser = {
         id: 'user-gvcn',
-        name: gvcnAcc ? `${gvcnAcc.name} (GVCN)` : 'Thầy Trần Duy Tân (GVCN)',
+        name: `${this.classInfo.gvcn_name || gvcnAcc?.name || 'Thầy Trần Duy Tân'} (GVCN)`,
         role: 'gvcn',
         class_id: 'class-10a16',
-        email: gvcnAcc?.email,
+        email: this.classInfo.gvcn_email || gvcnAcc?.email,
         isAuthenticatedOfficer: true,
       };
     } else if (role === 'lop_truong') {
-      const studentLt = this.students[0]; // Trần Đức Anh
+      const studentLt = this.students.find(
+        (s) => s.full_name === this.classInfo.class_president_name
+      ) || this.students[0];
       const ltAcc = this.officerAccounts.find((a) => a.role === 'lop_truong');
       this.currentUser = {
         id: 'user-lt',
-        name: `${studentLt?.full_name || 'Trần Đức Anh'} (Lớp trưởng)`,
+        name: `${this.classInfo.class_president_name || studentLt?.full_name || 'Lớp trưởng'} (Lớp trưởng)`,
         role: 'lop_truong',
         class_id: 'class-10a16',
         student_id: studentLt?.id,
@@ -313,11 +346,13 @@ class AppStateService {
         isAuthenticatedOfficer: true,
       };
     } else if (role === 'lop_pho') {
-      const studentLp = this.students[1]; // Lê Thiên Bảo
+      const studentLp = this.students.find(
+        (s) => s.full_name === this.classInfo.class_vice_discipline_name
+      ) || this.students[1];
       const lpAcc = this.officerAccounts.find((a) => a.role === 'lop_pho');
       this.currentUser = {
         id: 'user-lp',
-        name: `${studentLp?.full_name || 'Lê Thiên Bảo'} (Lớp phó Kỷ luật)`,
+        name: `${this.classInfo.class_vice_discipline_name || studentLp?.full_name || 'Lớp phó'} (Lớp phó Kỷ luật)`,
         role: 'lop_pho',
         class_id: 'class-10a16',
         student_id: studentLp?.id,
@@ -325,10 +360,10 @@ class AppStateService {
         isAuthenticatedOfficer: true,
       };
     } else if (role === 'to_truong') {
-      const studentTt = this.students[2]; // Nguyễn Gia Bảo
+      const studentTt = this.students[2];
       this.currentUser = {
         id: 'user-tt',
-        name: `${studentTt?.full_name || 'Nguyễn Gia Bảo'} (Tổ trưởng Tổ 1)`,
+        name: `${studentTt?.full_name || 'Tổ trưởng'} (Tổ trưởng Tổ 1)`,
         role: 'to_truong',
         class_id: 'class-10a16',
         student_id: studentTt?.id,
@@ -354,17 +389,165 @@ class AppStateService {
     this.notify();
   }
 
-  // --- Class Management & Settings ---
-  public updateClassInfo(updates: Partial<ClassInfo>) {
+  // --- Class Management & Settings (GVCN toàn quyền thay đổi không hạn chế) ---
+  public async updateClassInfo(updates: Partial<ClassInfo>) {
     Object.assign(this.classInfo, updates);
+
+    // Đồng bộ tức thời danh sách tài khoản cán sự
+    if (updates.class_president_name) {
+      const ltAcc = this.officerAccounts.find((a) => a.role === 'lop_truong');
+      if (ltAcc) ltAcc.name = updates.class_president_name;
+    }
+    if (updates.class_vice_discipline_name) {
+      const lpAcc = this.officerAccounts.find((a) => a.role === 'lop_pho');
+      if (lpAcc) lpAcc.name = updates.class_vice_discipline_name;
+    }
+    if (updates.gvcn_name) {
+      this.officerAccounts.filter((a) => a.role === 'gvcn').forEach((a) => (a.name = updates.gvcn_name!));
+    }
+    if (updates.gvcn_email) {
+      const gAcc = this.officerAccounts.find((a) => a.id === 'acc-gvcn-user');
+      if (gAcc) gAcc.email = updates.gvcn_email;
+    }
+
+    // Cập nhật tên người dùng hiện tại nếu đang ở vai trò cán sự
+    if (this.currentUser.role === 'gvcn') {
+      this.currentUser.name = `${this.classInfo.gvcn_name} (GVCN)`;
+    } else if (this.currentUser.role === 'lop_truong') {
+      this.currentUser.name = `${this.classInfo.class_president_name} (Lớp trưởng)`;
+    } else if (this.currentUser.role === 'lop_pho') {
+      this.currentUser.name = `${this.classInfo.class_vice_discipline_name} (Lớp phó Kỷ luật)`;
+    }
+
+    // Lưu ngay lập tức vào LocalStorage để không bao giờ bị mất dữ liệu
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('VTT_CLASS_INFO', JSON.stringify(this.classInfo));
+        localStorage.setItem('VTT_OFFICER_ACCOUNTS', JSON.stringify(this.officerAccounts));
+      } catch (e) {}
+    }
+
     this.addAuditLog(
       this.currentUser.name,
       'Cập nhật thông tin Lớp học & Ban cán sự',
       'class_info',
       'class-10a16',
-      'GVCN/Ban cán sự điều chỉnh nội dung lớp học'
+      'GVCN toàn quyền điều chỉnh nội dung lớp học & Ban cán sự'
     );
     this.notify();
+
+    // Đồng bộ trực tiếp lên cơ sở dữ liệu Supabase Production
+    if (supabase) {
+      try {
+        await supabase.from('classes').upsert({
+          id: 'class-10a16',
+          name: this.classInfo.class_name,
+          academic_year_id: 'ay-2026-2027',
+          gvcn_name: this.classInfo.gvcn_name,
+        });
+
+        await supabase.from('audit_logs').insert([{
+          actor_name: this.currentUser.name || 'GVCN Thầy Tân',
+          actor_role: this.currentUser.role || 'gvcn',
+          action: 'SYNC_CLASS_INFO',
+          entity_type: 'class_info',
+          entity_id: 'class-10a16',
+          reason: JSON.stringify({
+            classInfo: this.classInfo,
+            officerAccounts: this.officerAccounts,
+            groups: this.groups,
+          }),
+        }]);
+      } catch (err) {
+        console.warn('Lỗi đồng bộ Ban Cán Sự lên Supabase:', err);
+      }
+    }
+  }
+
+  // Cập nhật Tổ trưởng tổ tự quản
+  public async updateGroupLeader(groupId: string, leaderStudentId: string) {
+    const group = this.groups.find((g) => g.id === groupId);
+    if (!group) return;
+    group.leader_student_id = leaderStudentId;
+
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('VTT_GROUPS', JSON.stringify(this.groups));
+      } catch (e) {}
+    }
+
+    this.addAuditLog(
+      this.currentUser.name,
+      `Chỉ định Tổ trưởng Tổ ${group.group_number}`,
+      'groups',
+      groupId,
+      `Mã HS: ${leaderStudentId}`
+    );
+    this.notify();
+
+    if (supabase) {
+      try {
+        await supabase.from('groups').upsert({
+          id: group.id,
+          class_id: 'class-10a16',
+          group_number: group.group_number,
+          group_name: group.group_name,
+          leader_student_id: leaderStudentId || null,
+        }, { onConflict: 'id' });
+
+        await supabase.from('audit_logs').insert([{
+          actor_name: this.currentUser.name || 'GVCN Thầy Tân',
+          actor_role: this.currentUser.role || 'gvcn',
+          action: 'SYNC_CLASS_INFO',
+          entity_type: 'class_info',
+          entity_id: 'class-10a16',
+          reason: JSON.stringify({
+            classInfo: this.classInfo,
+            officerAccounts: this.officerAccounts,
+            groups: this.groups,
+          }),
+        }]);
+      } catch (e) {
+        console.warn('Lỗi lưu Tổ trưởng lên Supabase:', e);
+      }
+    }
+  }
+
+  // Cập nhật Mã PIN bảo mật cán sự
+  public updateOfficerPin(role: 'gvcn' | 'lop_truong' | 'lop_pho', newPin: string) {
+    const acc = this.officerAccounts.find((a) => a.role === role);
+    if (!acc) return;
+    acc.pin = newPin.trim();
+
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('VTT_OFFICER_ACCOUNTS', JSON.stringify(this.officerAccounts));
+      } catch (e) {}
+    }
+
+    this.addAuditLog(
+      this.currentUser.name,
+      `Cập nhật mã PIN bảo mật cho ${acc.title}`,
+      'officer_auth',
+      acc.id
+    );
+    this.showToast(`Đã đổi mã PIN cho ${acc.title} thành công!`, 'success');
+    this.notify();
+
+    if (supabase) {
+      supabase.from('audit_logs').insert([{
+        actor_name: this.currentUser.name,
+        actor_role: this.currentUser.role,
+        action: 'SYNC_CLASS_INFO',
+        entity_type: 'class_info',
+        entity_id: 'class-10a16',
+        reason: JSON.stringify({
+          classInfo: this.classInfo,
+          officerAccounts: this.officerAccounts,
+          groups: this.groups,
+        }),
+      }]).then();
+    }
   }
 
   // --- Officer Accounts & Permissions Control ---
@@ -1321,6 +1504,15 @@ class AppStateService {
           .on('postgres_changes', { event: '*', schema: 'public', table: 'attendance_records' }, () => {
             this.fetchFromSupabase(true);
           })
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'classes' }, () => {
+            this.fetchFromSupabase(true);
+          })
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'groups' }, () => {
+            this.fetchFromSupabase(true);
+          })
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'audit_logs' }, () => {
+            this.fetchFromSupabase(true);
+          })
           .subscribe();
       }
     } catch (e) {
@@ -1559,6 +1751,60 @@ class AppStateService {
           reason: a.reason || undefined,
           is_legitimate_exception: Boolean(a.is_legitimate_exception),
         }));
+      }
+
+      // 5. Fetch Class Info & Ban Cán Sự from Supabase Audit Logs & Classes
+      try {
+        const { data: classAudit } = await supabase
+          .from('audit_logs')
+          .select('*')
+          .eq('entity_type', 'class_info')
+          .eq('entity_id', 'class-10a16')
+          .order('created_at', { ascending: false })
+          .limit(1);
+
+        if (classAudit && classAudit.length > 0 && classAudit[0].reason) {
+          const parsed = JSON.parse(classAudit[0].reason);
+          if (parsed.classInfo) {
+            this.classInfo = { ...this.classInfo, ...parsed.classInfo };
+            if (typeof window !== 'undefined') {
+              localStorage.setItem('VTT_CLASS_INFO', JSON.stringify(this.classInfo));
+            }
+          }
+          if (parsed.officerAccounts && Array.isArray(parsed.officerAccounts)) {
+            this.officerAccounts = parsed.officerAccounts;
+            if (typeof window !== 'undefined') {
+              localStorage.setItem('VTT_OFFICER_ACCOUNTS', JSON.stringify(this.officerAccounts));
+            }
+          }
+          if (parsed.groups && Array.isArray(parsed.groups)) {
+            this.groups = parsed.groups;
+            if (typeof window !== 'undefined') {
+              localStorage.setItem('VTT_GROUPS', JSON.stringify(this.groups));
+            }
+          }
+        }
+
+        const { data: clsData } = await supabase.from('classes').select('*').eq('id', 'class-10a16').limit(1);
+        if (clsData && clsData.length > 0) {
+          if (clsData[0].gvcn_name) this.classInfo.gvcn_name = clsData[0].gvcn_name;
+          if (clsData[0].name) this.classInfo.class_name = clsData[0].name;
+        }
+
+        const { data: grpData } = await supabase.from('groups').select('*').eq('class_id', 'class-10a16');
+        if (grpData && grpData.length > 0) {
+          grpData.forEach((g: any) => {
+            const localGrp = this.groups.find((lg) => lg.id === g.id);
+            if (localGrp && g.leader_student_id) {
+              localGrp.leader_student_id = g.leader_student_id;
+            }
+          });
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('VTT_GROUPS', JSON.stringify(this.groups));
+          }
+        }
+      } catch (err) {
+        console.warn('Lỗi đồng bộ Ban Cán Sự từ Supabase:', err);
       }
 
       this.calculateAllWeeklyScores(1);
