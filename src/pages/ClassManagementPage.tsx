@@ -238,26 +238,26 @@ export const ClassManagementPage: React.FC<Props> = ({ onNavigate, onOpenAuthMod
             </p>
           </div>
 
-          <form onSubmit={handleQuickGvcnLogin} className="flex items-center gap-2 shrink-0">
+          <form onSubmit={handleQuickGvcnLogin} className="flex items-center gap-2.5 shrink-0">
             <div className="relative">
               <KeyRound className="w-4 h-4 text-amber-600 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="password"
-                placeholder="Mã PIN GVCN (1016)..."
+                placeholder="Nhập mã PIN GVCN..."
                 value={quickPinInput}
                 onChange={(e) => setQuickPinInput(e.target.value)}
-                className="pl-9 pr-3 py-2 text-xs font-mono border rounded-xl border-amber-300 bg-white focus:outline-hidden focus:ring-2 focus:ring-amber-500 w-44"
+                className="pl-9 pr-3.5 py-2.5 text-sm font-mono border-2 rounded-xl border-amber-300 bg-white focus:outline-hidden focus:ring-2 focus:ring-amber-500 w-52 text-slate-900"
               />
             </div>
             <button
               type="submit"
-              className="px-3.5 py-2 text-xs font-bold bg-amber-600 hover:bg-amber-500 text-white rounded-xl shadow-xs transition active:scale-95 cursor-pointer shrink-0"
+              className="px-4 py-2.5 text-sm font-bold bg-amber-600 hover:bg-amber-500 text-white rounded-xl shadow-xs transition active:scale-95 cursor-pointer shrink-0"
             >
               Mở quyền GVCN
             </button>
           </form>
           {quickPinError && (
-            <p className="text-xs text-rose-600 font-bold col-span-full">{quickPinError}</p>
+            <p className="text-sm text-rose-600 font-bold col-span-full">{quickPinError}</p>
           )}
         </div>
       )}
@@ -444,24 +444,31 @@ export const ClassManagementPage: React.FC<Props> = ({ onNavigate, onOpenAuthMod
               {/* GVCN */}
               <div className="p-3.5 bg-blue-50/70 rounded-xl border border-blue-200 flex items-center justify-between">
                 <div>
-                  <div className="text-[10px] font-extrabold uppercase tracking-wider text-blue-700">
+                  <div className="text-xs font-extrabold uppercase tracking-wider text-blue-700">
                     Giáo viên Chủ nhiệm (GVCN)
                   </div>
-                  <div className="font-black text-slate-900 text-sm mt-0.5">{classInfo.gvcn_name}</div>
-                  <div className="text-[11px] text-slate-600 font-mono mt-1 space-y-0.5">
-                    <div className="flex items-center gap-1.5">
-                      <Mail className="w-3 h-3 text-blue-600" />
-                      <span>{classInfo.gvcn_email}</span>
-                    </div>
-                    {classInfo.gvcn_phone && (
-                      <div className="flex items-center gap-1.5">
-                        <Phone className="w-3 h-3 text-emerald-600" />
+                  <div className="font-black text-slate-900 text-base mt-0.5">{classInfo.gvcn_name}</div>
+                  <div className="text-xs text-slate-600 mt-1 space-y-0.5">
+                    {canManageClass && classInfo.gvcn_email ? (
+                      <div className="flex items-center gap-1.5 font-mono text-xs text-blue-800">
+                        <Mail className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                        <span className="truncate">{classInfo.gvcn_email}</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1.5 text-xs text-slate-500">
+                        <School className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                        <span>{classInfo.room_number} · THPT Võ Trường Toản</span>
+                      </div>
+                    )}
+                    {canManageClass && classInfo.gvcn_phone && (
+                      <div className="flex items-center gap-1.5 text-xs text-slate-700">
+                        <Phone className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                         <span>{classInfo.gvcn_phone}</span>
                       </div>
                     )}
                   </div>
                 </div>
-                <span className="px-2 py-0.5 text-[10px] font-extrabold bg-blue-600 text-white rounded-md shadow-xs">
+                <span className="px-2.5 py-1 text-xs font-black bg-blue-600 text-white rounded-lg shadow-xs">
                   Toàn quyền
                 </span>
               </div>

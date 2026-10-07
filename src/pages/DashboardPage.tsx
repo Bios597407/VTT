@@ -18,6 +18,7 @@ import {
   Phone,
   Edit3,
   Sparkles,
+  School,
 } from 'lucide-react';
 import { NavTab } from '../components/Sidebar';
 
@@ -257,20 +258,20 @@ export const DashboardPage: React.FC<Props> = ({
                 </span>
               </div>
               <div className="font-black text-slate-900 text-sm sm:text-base">{classInfo.gvcn_name}</div>
-              <div className="text-[11px] text-slate-600 mt-1 space-y-0.5 font-mono">
-                <div className="flex items-center gap-1.5 truncate">
-                  <Mail className="w-3 h-3 text-blue-600 shrink-0" />
-                  <span className="truncate">{classInfo.gvcn_email}</span>
+              <div className="text-xs text-slate-600 mt-1 space-y-1">
+                <div className="flex items-center gap-1.5 text-slate-700">
+                  <School className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                  <span>{classInfo.room_number} · THPT Võ Trường Toản</span>
                 </div>
-                {classInfo.gvcn_phone && (
-                  <div className="flex items-center gap-1.5">
-                    <Phone className="w-3 h-3 text-emerald-600 shrink-0" />
-                    <span>{classInfo.gvcn_phone}</span>
+                {canManageClass && classInfo.gvcn_email && (
+                  <div className="flex items-center gap-1.5 font-mono text-[11px] text-blue-800 truncate">
+                    <Mail className="w-3 h-3 text-blue-600 shrink-0" />
+                    <span className="truncate">{classInfo.gvcn_email}</span>
                   </div>
                 )}
               </div>
             </div>
-            <div className="text-[10px] text-blue-800/80 font-medium mt-2 pt-2 border-t border-blue-200/60">
+            <div className="text-xs text-blue-800 font-semibold mt-2 pt-2 border-t border-blue-200/60">
               Chỉ đạo toàn diện nề nếp & giáo dục
             </div>
           </div>
