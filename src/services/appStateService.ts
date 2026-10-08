@@ -19,6 +19,8 @@ import {
   AnnualResult,
   AuditLog,
   RoleType,
+  SeatingPlan,
+  DutyRosterDay,
 } from '../types';
 import { PRIVATE_ROSTER_10A16 } from '../lib/privateRosterLoader';
 import { OFFICIAL_PENDING_RULES } from '../domain/scoring/pendingRules';
@@ -178,6 +180,16 @@ class AppStateService {
   public students: Student[] = buildOfficial10A16Students();
   public groups: Group[] = [...OFFICIAL_10A16_GROUPS];
   public seats: Seat[] = [];
+  public seatingPlans: SeatingPlan[] = [];
+  public activeSeatingPlanId: string = 'plan-official';
+  public dutyRoster: DutyRosterDay[] = [
+    { dayOfWeek: 'thu2', dayLabel: 'Thứ 2', assignedGroupId: 'group-01', groupName: 'Tổ 1', status: 'pending', notes: 'Trực nhật sáng & phục vụ Chào cờ' },
+    { dayOfWeek: 'thu3', dayLabel: 'Thứ 3', assignedGroupId: 'group-02', groupName: 'Tổ 2', status: 'pending', notes: 'Quét lớp, lau bảng & gom rác' },
+    { dayOfWeek: 'thu4', dayLabel: 'Thứ 4', assignedGroupId: 'group-03', groupName: 'Tổ 3', status: 'pending', notes: 'Kê ngay ngắn bàn ghế & tưới cây' },
+    { dayOfWeek: 'thu5', dayLabel: 'Thứ 5', assignedGroupId: 'group-04', groupName: 'Tổ 4', status: 'pending', notes: 'Vệ sinh cửa sổ, lau bàn GV' },
+    { dayOfWeek: 'thu6', dayLabel: 'Thứ 6', assignedGroupId: 'group-01', groupName: 'Tổ 1', status: 'pending', notes: 'Tổng vệ sinh học tập' },
+    { dayOfWeek: 'thu7', dayLabel: 'Thứ 7', assignedGroupId: 'group-02', groupName: 'Tổ 2', status: 'pending', notes: 'Tổng vệ sinh cuối tuần, đóng quạt & đèn' },
+  ];
   public incidents: Incident[] = [];
   public rewards: RewardRecord[] = [];
   public attendance: AttendanceRecord[] = [];
@@ -305,6 +317,34 @@ class AppStateService {
         }
         this.ensureCapacitySeats();
 
+        const savedPlans = localStorage.getItem('VTT_SEATING_PLANS');
+        if (savedPlans) {
+          const parsed = JSON.parse(savedPlans);
+          if (Array.isArray(parsed) && parsed.length > 0) this.seatingPlans = parsed;
+        }
+        const savedPlanId = localStorage.getItem('VTT_ACTIVE_SEATING_PLAN_ID');
+        if (savedPlanId) this.activeSeatingPlanId = savedPlanId;
+
+        // Auto-initialize default seating plan if none exists
+        if (this.seatingPlans.length === 0) {
+          this.seatingPlans = [
+            {
+              id: 'plan-official',
+              name: 'Sơ đồ Lớp 10A16 (Hiện tại)',
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+              seats: JSON.parse(JSON.stringify(this.seats)),
+            },
+          ];
+          this.activeSeatingPlanId = 'plan-official';
+        }
+
+        const savedDuty = localStorage.getItem('VTT_DUTY_ROSTER');
+        if (savedDuty) {
+          const parsed = JSON.parse(savedDuty);
+          if (Array.isArray(parsed) && parsed.length > 0) this.dutyRoster = parsed;
+        }
+
         const savedTasks = localStorage.getItem('VTT_TASKS');
         if (savedTasks) {
           const parsed = JSON.parse(savedTasks);
@@ -422,6 +462,9 @@ class AppStateService {
       localStorage.setItem('VTT_ATTENDANCE', JSON.stringify(this.attendance));
       localStorage.setItem('VTT_STUDENTS', JSON.stringify(this.students));
       localStorage.setItem('VTT_SEATS', JSON.stringify(this.seats));
+      localStorage.setItem('VTT_SEATING_PLANS', JSON.stringify(this.seatingPlans));
+      localStorage.setItem('VTT_ACTIVE_SEATING_PLAN_ID', this.activeSeatingPlanId);
+      localStorage.setItem('VTT_DUTY_ROSTER', JSON.stringify(this.dutyRoster));
       localStorage.setItem('VTT_TASKS', JSON.stringify(this.tasks));
       localStorage.setItem('VTT_POSITIVE_NOTES', JSON.stringify(this.positiveNotes));
       localStorage.setItem('VTT_PENDING_RULES', JSON.stringify(this.pendingRules));
@@ -1426,6 +1469,192 @@ class AppStateService {
       `Phương pháp: ${method}`
     );
     this.notify();
+  }
+
+  // --- Multi-Plan Seating Management ---
+  public saveCurrentSeatsToPlan(planName?: string) {
+    const activePlan = this.seatingPlans.find((p) => p.id === this.activeSeatingPlanId);
+    if (activePlan) {
+      if (planName && planName.trim()) activePlan.name = planName.trim();
+      activePlan.seats = JSON.parse(JSON.stringify(this.seats));
+      activePlan.updated_at = new Date().toISOString();
+      this.showToast(`Đã lưu sơ đồ [${activePlan.name}] thành công!`, 'success');
+      this.notify();
+    }
+  }
+
+  public loadSeatingPlan(planId: string) {
+    const plan = this.seatingPlans.find((p) => p.id === planId);
+    if (!plan) return;
+    this.createSeatingBackupSnapshot();
+    this.activeSeatingPlanId = plan.id;
+    this.seats = JSON.parse(JSON.stringify(plan.seats));
+    // Ensure all seats sync with their column groups
+    this.seats.forEach((seat) => {
+      if (seat.student_id) {
+        this.syncStudentGroupWithSeatColumn(seat.student_id, seat);
+      }
+    });
+    this.showToast(`Đã chuyển sang phương án sơ đồ: [${plan.name}]`, 'info');
+    this.notify();
+  }
+
+  public createNewSeatingPlan(name: string, cloneFromCurrent: boolean = true) {
+    const newId = `plan-${Date.now()}`;
+    const cleanName = name.trim() || `Sơ đồ Mới (${new Date().toLocaleDateString('vi-VN')})`;
+    const newPlan: SeatingPlan = {
+      id: newId,
+      name: cleanName,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      seats: cloneFromCurrent ? JSON.parse(JSON.stringify(this.seats)) : [],
+    };
+
+    if (!cloneFromCurrent) {
+      // Create empty seats layout
+      this.seats.forEach((s) => {
+        newPlan.seats.push({ ...s, student_id: undefined });
+      });
+    }
+
+    this.seatingPlans.push(newPlan);
+    this.activeSeatingPlanId = newId;
+    this.seats = JSON.parse(JSON.stringify(newPlan.seats));
+    this.showToast(`Đã tạo phương án sơ đồ chỗ ngồi mới: [${cleanName}]!`, 'success');
+    this.notify();
+  }
+
+  public deleteSeatingPlan(planId: string) {
+    if (this.seatingPlans.length <= 1) {
+      this.showToast('Cần giữ lại ít nhất 1 phương án sơ đồ chỗ ngồi!', 'warn');
+      return;
+    }
+    const targetPlan = this.seatingPlans.find((p) => p.id === planId);
+    this.seatingPlans = this.seatingPlans.filter((p) => p.id !== planId);
+    if (this.activeSeatingPlanId === planId) {
+      this.activeSeatingPlanId = this.seatingPlans[0].id;
+      this.seats = JSON.parse(JSON.stringify(this.seatingPlans[0].seats));
+    }
+    this.showToast(`Đã xóa phương án sơ đồ [${targetPlan?.name || ''}]!`, 'info');
+    this.notify();
+  }
+
+  // --- Duty Roster & Rotating Schedule ---
+  public updateDutyRosterDay(dayOfWeek: string, updates: Partial<DutyRosterDay>) {
+    const dayIndex = this.dutyRoster.findIndex((d) => d.dayOfWeek === dayOfWeek);
+    if (dayIndex !== -1) {
+      const assignedGroup = this.groups.find((g) => g.id === updates.assignedGroupId);
+      this.dutyRoster[dayIndex] = {
+        ...this.dutyRoster[dayIndex],
+        ...updates,
+        groupName: assignedGroup ? assignedGroup.group_name : this.dutyRoster[dayIndex].groupName,
+      };
+      this.showToast(`Đã cập nhật lịch trực nhật [${this.dutyRoster[dayIndex].dayLabel}]!`, 'success');
+      this.notify();
+    }
+  }
+
+  public autoRotateDutyRoster() {
+    if (this.groups.length === 0) return;
+    this.dutyRoster.forEach((d, idx) => {
+      const nextGroup = this.groups[idx % this.groups.length];
+      if (nextGroup) {
+        d.assignedGroupId = nextGroup.id;
+        d.groupName = nextGroup.group_name;
+        d.leaderStudentId = nextGroup.leader_student_id;
+      }
+    });
+    this.showToast('Đã xoay vòng phân công trực nhật theo 4 Tổ!', 'success');
+    this.notify();
+  }
+
+  // --- Zalo Weekly Report Generator ---
+  public generateZaloWeeklyReport(weekNumber: number = 1, customNotes: string = '', showViolatorNames: boolean = true): string {
+    const classInfo = this.classInfo;
+    const totalStudents = this.students.length;
+
+    // Filter attendance
+    const permittedAbsences = this.attendance.filter((a) => a.status === 'permitted_absence').length;
+    const unpermittedAbsences = this.attendance.filter((a) => a.status === 'unpermitted_absence' || a.status === 'truancy').length;
+    const totalLates = this.attendance.filter((a) => a.status === 'late').length;
+
+    // Incidents & Rewards
+    const approvedIncidents = this.incidents.filter((i) => i.incident_status === 'approved');
+    const approvedRewards = this.rewards.filter((r) => r.status === 'approved');
+
+    // Group scores calculation
+    const weeklySnaps = this.weeklySnapshots.filter((s) => s.week_number === weekNumber && s.is_current);
+    const groupScores = this.groups.map((g) => {
+      const groupStudents = this.students.filter((s) => s.group_id === g.id);
+      if (groupStudents.length === 0) return { name: g.group_name, score: 8.0 };
+      const totalScore = groupStudents.reduce((acc, stu) => {
+        const snap = weeklySnaps.find((s) => s.student_id === stu.id);
+        return acc + (snap?.official_week_score ?? 8.0);
+      }, 0);
+      return {
+        name: g.group_name,
+        score: Number((totalScore / groupStudents.length).toFixed(1)),
+      };
+    }).sort((a, b) => b.score - a.score);
+
+    const topGroup = groupScores[0];
+
+    let text = `📣 [BÁO CÁO NỀ NẾP & THI ĐƯA TUẦN ${weekNumber < 10 ? '0' + weekNumber : weekNumber}]\n`;
+    text += `🏫 LỚP ${classInfo.class_name.toUpperCase()} - TRƯỜNG THPT VÕ TRƯỜNG TOẢN\n`;
+    text += `👨‍🏫 GVCN: ${classInfo.gvcn_name || 'Thầy Trần Duy Tân'} | Sĩ số: ${totalStudents}/${totalStudents} HS\n`;
+    text += `────────────────────\n\n`;
+
+    text += `📊 1. THỐNG KÊ CHUYÊN CẦN TUẦN:\n`;
+    text += `• Vắng có phép: ${permittedAbsences} lượt\n`;
+    text += `• Vắng không phép: ${unpermittedAbsences} lượt\n`;
+    text += `• Đi trễ / Trốn tiết: ${totalLates} lượt\n\n`;
+
+    text += `🏆 2. THI ĐƯA TỔ & TUYÊN DƯƠNG:\n`;
+    if (topGroup) {
+      text += `• 🥇 Tổ dẫn đầu tuần: ${topGroup.name} (Điểm TB: ${topGroup.score}/10)\n`;
+    }
+    if (approvedRewards.length > 0) {
+      const names = approvedRewards.map((r) => {
+        const stu = this.students.find((s) => s.id === r.student_id);
+        return stu ? stu.full_name : '';
+      }).filter(Boolean).slice(0, 5).join(', ');
+      text += `• 👏 Tuyên dương xuất sắc: ${names} (+${approvedRewards.length} lượt điểm thưởng)\n`;
+    } else {
+      text += `• 👏 Tuyên dương tinh thần tự giác nề nếp của tập thể Lớp 10A16.\n`;
+    }
+    text += `\n`;
+
+    text += `⚠️ 3. TÌNH HÌNH NỀ NẾP & KỶ LUẬT:\n`;
+    if (approvedIncidents.length === 0) {
+      text += `• ✅ Tuần qua Lớp ${classInfo.class_name} duy trì nề nếp rất tốt, không có vi phạm.\n`;
+    } else {
+      text += `• Ghi nhận ${approvedIncidents.length} lượt vi phạm nề nếp.\n`;
+      if (showViolatorNames) {
+        approvedIncidents.slice(0, 5).forEach((inc) => {
+          const stu = this.students.find((s) => s.id === inc.student_id);
+          text += `  - ${stu?.full_name || 'Học sinh'}: ${inc.notes || 'Nhắc nhở nề nếp'}\n`;
+        });
+      }
+    }
+    text += `\n`;
+
+    text += `🧹 4. LỊCH TRỰC NHẬT TUẦN TỚI:\n`;
+    this.dutyRoster.forEach((d) => {
+      text += `• ${d.dayLabel}: ${d.groupName}\n`;
+    });
+    text += `\n`;
+
+    text += `📝 5. DẶN DÒ CỦA GVCN:\n`;
+    if (customNotes.trim()) {
+      text += `${customNotes.trim()}\n`;
+    } else {
+      text += `• Học sinh thực hiện đúng trang phục, đeo bảng tên và đi học đúng giờ.\n`;
+      text += `• Ban cán sự lớp kiểm tra nề nếp và theo dõi vệ sinh lớp học.\n`;
+    }
+    text += `\n`;
+    text += `Trân trọng cảm ơn sự phối hợp đồng hành của Quý Phụ huynh Lớp ${classInfo.class_name}! ❤️`;
+
+    return text;
   }
 
   // --- Attendance ---

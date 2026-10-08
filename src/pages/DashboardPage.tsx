@@ -148,6 +148,18 @@ export const DashboardPage: React.FC<Props> = ({
 
           <div className="flex flex-wrap gap-2.5">
             <button
+              onClick={() => onNavigate('reports')}
+              className="min-h-[44px] px-3.5 py-2 bg-gradient-to-r from-blue-700 to-indigo-800 hover:from-blue-600 hover:to-indigo-700 text-white text-xs font-bold rounded-xl shadow-xs transition active:scale-95 cursor-pointer flex items-center justify-center gap-1.5"
+            >
+              <span>📱 Báo cáo Zalo 1-Click</span>
+            </button>
+            <button
+              onClick={() => onNavigate('tasks')}
+              className="min-h-[44px] px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-100 text-xs font-bold rounded-xl border border-slate-700 shadow-xs transition active:scale-95 cursor-pointer flex items-center justify-center gap-1.5"
+            >
+              <span>🧹 Lịch Trực Nhật Tuần</span>
+            </button>
+            <button
               onClick={() => onNavigate('class_info')}
               className="min-h-[44px] px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-100 text-xs font-bold rounded-xl border border-slate-700 shadow-xs transition active:scale-95 cursor-pointer flex items-center justify-center gap-1.5"
             >

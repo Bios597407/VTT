@@ -212,6 +212,27 @@ export interface AnnualResult {
   finalized_by?: string;
 }
 
+export interface SeatingPlan {
+  id: string;
+  name: string; // e.g. "Sơ đồ Tháng 9", "Sơ đồ Tháng 10 - Xoay bàn", "Sơ đồ Kiểm tra Định kỳ"
+  created_at: string;
+  updated_at: string;
+  seats: Seat[];
+}
+
+export interface DutyRosterDay {
+  dayOfWeek: 'thu2' | 'thu3' | 'thu4' | 'thu5' | 'thu6' | 'thu7';
+  dayLabel: string; // "Thứ 2", "Thứ 3", etc.
+  assignedGroupId: string; // 'group-01', 'group-02', 'group-03', 'group-04'
+  groupName: string; // 'Tổ 1', 'Tổ 2', etc.
+  leaderStudentId?: string; // Tổ trưởng/Nhóm trưởng phụ trách
+  cleaners?: string[]; // IDs học sinh quét dọn/đổ rác
+  boardCleaners?: string[]; // IDs học sinh lau bảng/giặt giẻ
+  deskArrangers?: string[]; // IDs học sinh kê bàn ghế/đóng cửa
+  status?: 'pending' | 'completed_good' | 'completed_ok' | 'needs_improvement';
+  notes?: string;
+}
+
 export interface AuditLog {
   id: string;
   actor_name: string;

@@ -367,6 +367,82 @@ export const SeatingPage: React.FC = () => {
         </div>
       </div>
 
+      {/* MULTI-PLAN SEATING MANAGEMENT TOOLBAR */}
+      <div className="bg-gradient-to-r from-slate-900 to-slate-950 p-4 rounded-2xl border border-slate-800 text-white shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-3 no-print">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-blue-600/20 text-blue-400 rounded-xl border border-blue-500/30">
+            <LayoutGrid className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="text-xs font-bold text-blue-400 uppercase tracking-wider flex items-center gap-1.5">
+              <span>🗂️ PHƯƠNG ÁN SƠ ĐỒ CHỖ NGỒI LỚP 10A16</span>
+              <span className="text-[10px] px-2 py-0.5 bg-blue-500/20 text-blue-300 rounded-full border border-blue-400/20 font-mono">
+                {appState.seatingPlans.length} Phương án
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-300 mt-0.5">
+              Lưu trữ nhiều bản sơ đồ chỗ ngồi (Sơ đồ Học kỳ 1, Sơ đồ Tháng 10, Sơ đồ Thi...) và chuyển đổi linh hoạt.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Plan Selector Dropdown */}
+          <select
+            value={appState.activeSeatingPlanId}
+            onChange={(e) => appState.loadSeatingPlan(e.target.value)}
+            className="px-3 py-2 bg-slate-800 text-white font-bold text-xs rounded-xl border border-slate-700 shadow-xs cursor-pointer focus:ring-2 focus:ring-blue-500"
+          >
+            {appState.seatingPlans.map((plan) => (
+              <option key={plan.id} value={plan.id}>
+                📌 {plan.name}
+              </option>
+            ))}
+          </select>
+
+          {/* Create New Plan Button */}
+          <button
+            onClick={() => {
+              const name = prompt('Nhập tên cho Phương án Sơ đồ chỗ ngồi mới:', `Sơ đồ Tháng ${new Date().getMonth() + 1}`);
+              if (name && name.trim()) {
+                const clone = confirm('Bạn có muốn SAO CHÉP vị trí chỗ ngồi hiện tại sang sơ đồ mới này không?\n\n• Đồng ý (OK): Chép vị trí hiện tại\n• Hủy (Cancel): Tạo sơ đồ trắng');
+                appState.createNewSeatingPlan(name.trim(), clone);
+              }
+            }}
+            className="px-3 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-xs transition flex items-center gap-1.5 shadow-xs cursor-pointer"
+            title="Tạo thêm 1 phương án sơ đồ chỗ ngồi mới"
+          >
+            <UserPlus className="w-3.5 h-3.5" />
+            <span>➕ Tạo Sơ Đồ Mới</span>
+          </button>
+
+          {/* Save Active Plan Button */}
+          <button
+            onClick={() => appState.saveCurrentSeatsToPlan()}
+            className="px-3 py-2 bg-emerald-700 hover:bg-emerald-600 text-white font-bold rounded-xl text-xs transition flex items-center gap-1.5 shadow-xs cursor-pointer"
+            title="Lưu cập nhật vị trí hiện tại vào phương án sơ đồ đang chọn"
+          >
+            <Check className="w-3.5 h-3.5" />
+            <span>💾 Lưu Sơ Đồ</span>
+          </button>
+
+          {/* Delete Plan Button */}
+          {appState.seatingPlans.length > 1 && (
+            <button
+              onClick={() => {
+                if (confirm('Bạn có chắc chắn muốn xóa phương án sơ đồ chỗ ngồi này?')) {
+                  appState.deleteSeatingPlan(appState.activeSeatingPlanId);
+                }
+              }}
+              className="px-2.5 py-2 bg-slate-800 hover:bg-rose-950/80 text-rose-300 hover:text-rose-200 border border-slate-700 font-bold rounded-xl text-xs transition flex items-center gap-1 cursor-pointer"
+              title="Xóa phương án sơ đồ này"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+      </div>
+
       {/* Header & Controls Bar */}
       <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-4 no-print">
         <div>

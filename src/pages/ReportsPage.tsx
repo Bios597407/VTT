@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { appState } from '../services/appStateService';
 import { ExcelService } from '../services/excelService';
-import { FileSpreadsheet, Printer, Download, FileText, CheckCircle2 } from 'lucide-react';
+import { FileSpreadsheet, Printer, Download, FileText, CheckCircle2, MessageCircle, FileCheck, Sparkles } from 'lucide-react';
+import { ZaloReportModal } from '../components/ZaloReportModal';
+import { StudentReportCardModal } from '../components/StudentReportCardModal';
 
 export const ReportsPage: React.FC = () => {
   const students = appState.students;
@@ -10,6 +12,8 @@ export const ReportsPage: React.FC = () => {
   const incidents = appState.incidents;
 
   const [printPreview, setPrintPreview] = useState(false);
+  const [showZaloModal, setShowZaloModal] = useState(false);
+  const [showCardsModal, setShowCardsModal] = useState(false);
 
   const handleExportWeek = () => {
     const currentSnaps = weeklySnapshots.filter((s) => s.week_number === 1 && s.is_current);
@@ -36,16 +40,85 @@ export const ReportsPage: React.FC = () => {
             Xuất Báo cáo Excel & Bản In Sư phạm
           </h2>
           <p className="text-xs text-slate-500">
-            Xuất file định dạng .xlsx thực thụ và mẫu in biên bản sinh hoạt lớp chính quy
+            Xuất file định dạng .xlsx thực thụ, báo cáo Zalo 1-click và Phiếu đánh giá rèn luyện 43 học sinh
           </p>
         </div>
-        <button
-          onClick={() => setPrintPreview(!printPreview)}
-          className="flex items-center gap-1.5 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl shadow-sm transition active:scale-95 cursor-pointer self-start sm:self-auto"
-        >
-          <Printer className="w-4 h-4" />
-          {printPreview ? 'Đóng chế độ in' : 'Xem mẫu in biên bản'}
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => setShowZaloModal(true)}
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-500 hover:to-indigo-600 text-white text-xs font-bold rounded-xl shadow-sm transition active:scale-95 cursor-pointer"
+          >
+            <MessageCircle className="w-4 h-4" />
+            Báo cáo Zalo Phụ Huynh
+          </button>
+          <button
+            onClick={() => setShowCardsModal(true)}
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-bold rounded-xl shadow-sm transition active:scale-95 cursor-pointer"
+          >
+            <FileCheck className="w-4 h-4" />
+            In Phiếu Rèn Luyện (43 HS)
+          </button>
+          <button
+            onClick={() => setPrintPreview(!printPreview)}
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl shadow-sm transition active:scale-95 cursor-pointer"
+          >
+            <Printer className="w-4 h-4" />
+            {printPreview ? 'Đóng chế độ in' : 'Xem mẫu in biên bản'}
+          </button>
+        </div>
+      </div>
+
+      {/* Feature Highlight Banners */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Zalo Report Banner Card */}
+        <div className="bg-gradient-to-br from-blue-900 to-indigo-950 p-5 rounded-2xl border border-blue-800 text-white shadow-md flex flex-col justify-between space-y-3">
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="px-2.5 py-0.5 bg-blue-500/20 text-blue-200 border border-blue-400/30 text-[10px] font-bold uppercase rounded-full tracking-wider flex items-center gap-1">
+                <Sparkles className="w-3 h-3 text-blue-300" /> Nâng Cấp Nổi Bật 1
+              </span>
+              <span className="text-xs font-bold text-blue-300">1-Click Copy</span>
+            </div>
+            <h3 className="font-extrabold text-base text-white">
+              📱 Mẫu Báo Cáo Tổng Kết 1-Click Gửi Nhóm Zalo Phụ Huynh
+            </h3>
+            <p className="text-xs text-blue-100/80 leading-relaxed">
+              Tự động tổng hợp chuyên cần, nề nếp, điểm thưởng thi đua, danh sách trực nhật và dặn dò của GVCN thành văn bản Zalo đẹp mắt.
+            </p>
+          </div>
+          <button
+            onClick={() => setShowZaloModal(true)}
+            className="w-full py-2.5 px-4 bg-blue-500 hover:bg-blue-400 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-2 shadow-sm transition cursor-pointer active:scale-98"
+          >
+            <MessageCircle className="w-4 h-4" />
+            Tạo Báo Cáo Zalo Ngay
+          </button>
+        </div>
+
+        {/* Student Report Cards Banner Card */}
+        <div className="bg-gradient-to-br from-slate-900 to-slate-950 p-5 rounded-2xl border border-slate-800 text-white shadow-md flex flex-col justify-between space-y-3">
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="px-2.5 py-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 text-[10px] font-bold uppercase rounded-full tracking-wider flex items-center gap-1">
+                <Sparkles className="w-3 h-3 text-emerald-400" /> Nâng Cấp Nổi Bật 4
+              </span>
+              <span className="text-xs font-bold text-emerald-400">Chuẩn BGD&ĐT</span>
+            </div>
+            <h3 className="font-extrabold text-base text-white">
+              📄 In Phiếu Đánh Giá Rèn Luyện / Sổ Liên Lạc Cá Nhân (43 HS)
+            </h3>
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Xuất bản in phiếu đánh giá kết quả rèn luyện cho toàn bộ 43 học sinh Lớp 10A16. Định dạng chuẩn Thông tư 22 kèm chữ ký xác nhận 3 bên.
+            </p>
+          </div>
+          <button
+            onClick={() => setShowCardsModal(true)}
+            className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-2 shadow-sm transition cursor-pointer active:scale-98"
+          >
+            <FileCheck className="w-4 h-4" />
+            In Phiếu Rèn Luyện 43 Học Sinh
+          </button>
+        </div>
       </div>
 
       {/* Excel Export Cards */}
@@ -208,6 +281,10 @@ export const ReportsPage: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Modals */}
+      <ZaloReportModal isOpen={showZaloModal} onClose={() => setShowZaloModal(false)} />
+      <StudentReportCardModal isOpen={showCardsModal} onClose={() => setShowCardsModal(false)} />
     </div>
   );
 };
