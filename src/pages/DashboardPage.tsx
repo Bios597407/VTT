@@ -803,7 +803,7 @@ export const DashboardPage: React.FC<Props> = ({
             { id: 'seating', label: 'Sơ đồ chỗ ngồi', desc: 'Bàn ghế 6 hàng x 4 cột', icon: Calendar, color: 'text-indigo-600 bg-indigo-50' },
             { id: 'incidents', label: 'Duyệt sự việc', desc: 'Hàng chờ kiểm tra', icon: AlertTriangle, color: 'text-rose-600 bg-rose-50' },
             { id: 'scoring', label: 'Bảng điểm tuần/kỳ', desc: 'Tính điểm & chốt kỳ', icon: CheckCircle2, color: 'text-teal-600 bg-teal-50' },
-            { id: 'pending_rules', label: '9 Quy tắc chờ', desc: 'QĐ 525 GVCN chốt', icon: HelpCircle, color: 'text-purple-600 bg-purple-50' },
+            { id: 'pending_rules', label: 'Quy tắc nề nếp', desc: 'QĐ 525 GVCN chốt', icon: HelpCircle, color: 'text-purple-600 bg-purple-50' },
             { id: 'reports', label: 'Xuất Excel / In', desc: 'Báo cáo chính quy', icon: FileSpreadsheet, color: 'text-emerald-600 bg-emerald-50' },
           ].map((item) => {
             const Icon = item.icon;

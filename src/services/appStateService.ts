@@ -396,6 +396,9 @@ class AppStateService {
   private saveLocalState() {
     if (typeof window === 'undefined') return;
     try {
+      localStorage.setItem('VTT_CLASS_INFO', JSON.stringify(this.classInfo));
+      localStorage.setItem('VTT_OFFICER_ACCOUNTS', JSON.stringify(this.officerAccounts));
+      localStorage.setItem('VTT_GROUPS', JSON.stringify(this.groups));
       localStorage.setItem('VTT_INCIDENTS', JSON.stringify(this.incidents));
       localStorage.setItem('VTT_REWARDS', JSON.stringify(this.rewards));
       localStorage.setItem('VTT_ATTENDANCE', JSON.stringify(this.attendance));
@@ -410,8 +413,86 @@ class AppStateService {
       localStorage.setItem('VTT_SEMESTER_SNAPSHOTS', JSON.stringify(this.semesterSnapshots));
       localStorage.setItem('VTT_PERIOD_LOCKS', JSON.stringify(this.periodLocks));
       localStorage.setItem('VTT_AUDIT_LOGS', JSON.stringify(this.auditLogs));
+      localStorage.setItem('VTT_LAST_SAVED_AT', new Date().toISOString());
     } catch (e) {
       console.warn('Lỗi lưu trạng thái vào localStorage:', e);
+    }
+  }
+
+  public exportFullDatabaseBackup() {
+    const backupData = {
+      app: 'THPT Võ Trường Toản - Lớp 10A16',
+      version: '2026.10',
+      exported_at: new Date().toISOString(),
+      exported_by: this.currentUser.name,
+      classInfo: this.classInfo,
+      officerAccounts: this.officerAccounts,
+      groups: this.groups,
+      students: this.students,
+      incidents: this.incidents,
+      rewards: this.rewards,
+      attendance: this.attendance,
+      seats: this.seats,
+      tasks: this.tasks,
+      positiveNotes: this.positiveNotes,
+      pendingRules: this.pendingRules,
+      conductCatalog: this.conductCatalog,
+      weeklySnapshots: this.weeklySnapshots,
+      monthlySnapshots: this.monthlySnapshots,
+      semesterSnapshots: this.semesterSnapshots,
+      periodLocks: this.periodLocks,
+      auditLogs: this.auditLogs,
+    };
+
+    const jsonString = JSON.stringify(backupData, null, 2);
+    const blob = new Blob([jsonString], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    const dateStr = new Date().toISOString().split('T')[0];
+    link.href = url;
+    link.download = `Sao_Luu_Du_Lieu_Lop_10A16_${dateStr}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    this.addAuditLog(this.currentUser.name, 'Tải tệp sao lưu toàn bộ cơ sở dữ liệu (.json)', 'backup', 'export');
+    this.showToast('✅ Đã tải về tệp sao lưu dữ liệu an toàn thành công!', 'success');
+  }
+
+  public importFullDatabaseBackup(jsonString: string): { success: boolean; message: string } {
+    try {
+      const parsed = JSON.parse(jsonString);
+      if (!parsed || typeof parsed !== 'object') {
+        return { success: false, message: 'Tệp sao lưu không hợp lệ.' };
+      }
+
+      if (parsed.classInfo && typeof parsed.classInfo === 'object') this.classInfo = parsed.classInfo;
+      if (Array.isArray(parsed.officerAccounts)) this.officerAccounts = parsed.officerAccounts;
+      if (Array.isArray(parsed.groups)) this.groups = parsed.groups;
+      if (Array.isArray(parsed.students)) this.students = parsed.students;
+      if (Array.isArray(parsed.incidents)) this.incidents = parsed.incidents;
+      if (Array.isArray(parsed.rewards)) this.rewards = parsed.rewards;
+      if (Array.isArray(parsed.attendance)) this.attendance = parsed.attendance;
+      if (Array.isArray(parsed.seats)) this.seats = parsed.seats;
+      if (Array.isArray(parsed.tasks)) this.tasks = parsed.tasks;
+      if (Array.isArray(parsed.positiveNotes)) this.positiveNotes = parsed.positiveNotes;
+      if (Array.isArray(parsed.pendingRules)) this.pendingRules = parsed.pendingRules;
+      if (Array.isArray(parsed.conductCatalog)) this.conductCatalog = parsed.conductCatalog;
+      if (Array.isArray(parsed.weeklySnapshots)) this.weeklySnapshots = parsed.weeklySnapshots;
+      if (Array.isArray(parsed.monthlySnapshots)) this.monthlySnapshots = parsed.monthlySnapshots;
+      if (Array.isArray(parsed.semesterSnapshots)) this.semesterSnapshots = parsed.semesterSnapshots;
+      if (parsed.periodLocks && typeof parsed.periodLocks === 'object') this.periodLocks = parsed.periodLocks;
+      if (Array.isArray(parsed.auditLogs)) this.auditLogs = parsed.auditLogs;
+
+      this.calculateAllWeeklyScores(1);
+      this.addAuditLog(this.currentUser.name, 'Khôi phục toàn bộ cơ sở dữ liệu từ tệp sao lưu JSON', 'backup', 'import');
+      this.notify();
+      this.showToast('🎉 Đã khôi phục toàn bộ dữ liệu ứng dụng thành công!', 'success');
+
+      return { success: true, message: 'Khôi phục dữ liệu thành công!' };
+    } catch (err: any) {
+      return { success: false, message: `Lỗi đọc tệp sao lưu: ${err.message}` };
     }
   }
 

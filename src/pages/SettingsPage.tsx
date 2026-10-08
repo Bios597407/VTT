@@ -174,6 +174,86 @@ export const SettingsPage: React.FC = () => {
         </div>
       </div>
 
+      {/* PERMANENT STORAGE & DATA BACKUP GUARANTEE CARD (MỨC ĐỘ ƯU TIÊN CAO NHẤT) */}
+      <div className="bg-gradient-to-r from-emerald-900 via-slate-900 to-blue-900 p-5 sm:p-6 rounded-3xl text-white shadow-lg space-y-4 border border-emerald-500/30">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center border border-emerald-400/30 shrink-0">
+              <HardDrive className="w-6 h-6" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="text-base sm:text-lg font-black tracking-tight text-white">
+                  Trung tâm Lưu trữ Vĩnh viễn & Sao lưu Cơ sở dữ liệu 10A16
+                </h3>
+                <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full bg-emerald-400 text-slate-950 uppercase tracking-wider">
+                  Ưu tiên Tối cao 🔥
+                </span>
+              </div>
+              <p className="text-xs text-emerald-200/80 mt-0.5">
+                Mọi nội dung thay đổi trên App đều được hệ thống tự động đồng bộ &amp; lưu trữ tức thì vĩnh viễn!
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 bg-emerald-950/60 border border-emerald-500/40 px-3.5 py-1.5 rounded-xl text-xs font-bold text-emerald-300 self-start sm:self-auto shrink-0">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            Lưu tự động tức thời (Real-time Auto-Save)
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-2">
+            <div className="text-xs font-bold text-emerald-300 flex items-center gap-2">
+              <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span>Chế độ Tự động Ghi nhớ Tức thì:</span>
+            </div>
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Tất cả các thao tác (điểm danh, ghi nhận vi phạm, khen thưởng, chỉnh sửa mã PIN, tài khoản cán sự, thông tin lớp học, phân tổ...) đều được ứng dụng tự động lưu lại tức thời 100% vào bộ nhớ vĩnh viễn của trình duyệt và đám mây Supabase.
+            </p>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-3 flex flex-col justify-between">
+            <div className="text-xs font-bold text-blue-300 flex items-center gap-2">
+              <Download className="w-4 h-4 text-blue-400 shrink-0" />
+              <span>Sao lưu Tệp An toàn Chống mất dữ liệu (Offline Backup File):</span>
+            </div>
+            <div className="flex flex-wrap items-center gap-2.5">
+              <button
+                type="button"
+                onClick={() => appState.exportFullDatabaseBackup()}
+                className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs rounded-xl shadow-md transition active:scale-95 cursor-pointer flex items-center gap-1.5"
+              >
+                <Download className="w-4 h-4" />
+                <span>Tải về Bản Sao Lưu (.json)</span>
+              </button>
+
+              <label className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white font-bold text-xs rounded-xl border border-white/20 transition active:scale-95 cursor-pointer flex items-center gap-1.5">
+                <Upload className="w-4 h-4 text-emerald-300" />
+                <span>Khôi phục Từ Tệp Sao Lưu</span>
+                <input
+                  type="file"
+                  accept=".json"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      const reader = new FileReader();
+                      reader.onload = (event) => {
+                        const content = event.target?.result as string;
+                        if (content) {
+                          appState.importFullDatabaseBackup(content);
+                        }
+                      };
+                      reader.readAsText(file);
+                    }
+                  }}
+                />
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         {/* Supabase Connection Status Card */}
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">

@@ -93,7 +93,7 @@ export const Sidebar: React.FC<Props> = ({
         { id: 'scoring', label: 'Bảng điểm & Xếp loại', icon: Calculator },
         {
           id: 'pending_rules',
-          label: '9 Quy tắc chờ GVCN',
+          label: 'Quy tắc chờ GVCN',
           icon: HelpCircle,
           badge: unresolvedRulesCount > 0 ? unresolvedRulesCount : undefined,
           badgeColor: 'bg-purple-600 text-white',

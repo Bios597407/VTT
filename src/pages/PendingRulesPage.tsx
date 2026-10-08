@@ -22,6 +22,9 @@ export const PendingRulesPage: React.FC = () => {
   const conductCatalog = appState.conductCatalog;
   const currentUser = appState.currentUser;
 
+  const unresolvedCount = pendingRules.filter((r) => r.status !== 'confirmed_by_gvcn').length;
+  const resolvedCount = pendingRules.filter((r) => r.status === 'confirmed_by_gvcn').length;
+
   // Tabs: 'pending_rules' | 'conduct_catalog'
   const [activeTab, setActiveTab] = useState<'pending_rules' | 'conduct_catalog'>('pending_rules');
 
@@ -57,7 +60,7 @@ export const PendingRulesPage: React.FC = () => {
           Khu vực Thẩm tra Quy tắc Nề nếp (Chỉ Cán sự / GVCN)
         </h2>
         <p className="text-xs text-slate-600 leading-relaxed">
-          Mục 9 Quy tắc chờ GVCN và Danh mục vi phạm QĐ 525 yêu cầu quyền Ban Cán sự hoặc GVCN để xem xét và quyết định phương án xử lý. Vui lòng đăng nhập để truy cập.
+          Mục Quy tắc chờ GVCN và Danh mục vi phạm QĐ 525 yêu cầu quyền Ban Cán sự hoặc GVCN để xem xét và quyết định phương án xử lý. Vui lòng đăng nhập để truy cập.
         </p>
       </div>
     );
@@ -74,9 +77,39 @@ export const PendingRulesPage: React.FC = () => {
     e.preventDefault();
     if (!selectedRule || !selectedOptionId) return;
 
-    appState.configurePendingRule(selectedRule.code, selectedOptionId, basis, effectiveFrom);
-    appState.showToast(`Đã lưu cấu hình nề nếp cho quy tắc ${selectedRule.code}!`, 'success');
+    const finalBasis = basis.trim() || 'Thống nhất phê duyệt chính thức theo thẩm quyền GVCN & Ban Cán sự Lớp 10A16';
+    appState.configurePendingRule(selectedRule.code, selectedOptionId, finalBasis, effectiveFrom);
+    appState.showToast(`🎉 Đã phê duyệt chính thức quy tắc ${selectedRule.code}!`, 'success');
     setSelectedRule(null);
+  };
+
+  const handleQuickApprove = (rule: PendingRule) => {
+    const selectedOpt = rule.selected_option || rule.options[0]?.id || '';
+    appState.configurePendingRule(
+      rule.code,
+      selectedOpt,
+      'Phê duyệt nhanh theo thẩm quyền GVCN Lớp 10A16',
+      new Date().toISOString().split('T')[0]
+    );
+    appState.showToast(`🎉 Đã phê duyệt chính thức quy tắc ${rule.code}!`, 'success');
+  };
+
+  const handleApproveAllPending = () => {
+    const unapproved = pendingRules.filter((r) => r.status !== 'confirmed_by_gvcn');
+    if (unapproved.length === 0) return;
+
+    if (confirm(`Bạn có chắc chắn muốn PHÊ DUYỆT TẤT CẢ ${unapproved.length} quy tắc nề nếp chưa duyệt không?`)) {
+      unapproved.forEach((rule) => {
+        const selectedOpt = rule.selected_option || rule.options[0]?.id || '';
+        appState.configurePendingRule(
+          rule.code,
+          selectedOpt,
+          'Phê duyệt đồng loạt theo thẩm quyền GVCN Lớp 10A16',
+          new Date().toISOString().split('T')[0]
+        );
+      });
+      appState.showToast(`🎉 Đã phê duyệt chính thức toàn bộ ${unapproved.length} quy tắc nề nếp!`, 'success');
+    }
   };
 
   const handleOpenEditCatalog = (item: ConductCatalogItem) => {
@@ -172,73 +205,103 @@ export const PendingRulesPage: React.FC = () => {
       </div>
 
       {/* Tabs */}
-      <div className="flex items-center gap-2 border-b border-slate-200 pb-2 text-xs font-bold">
-        <button
-          onClick={() => setActiveTab('pending_rules')}
-          className={`px-3.5 py-2 rounded-xl transition cursor-pointer flex items-center gap-2 ${
-            activeTab === 'pending_rules'
-              ? 'bg-purple-100 text-purple-900 font-extrabold shadow-xs'
-              : 'text-slate-600 hover:bg-slate-100'
-          }`}
-        >
-          <Scale className="w-4 h-4" />
-          <span>9 Quy tắc Chờ Xác nhận (PENDING-01 &rarr; 09)</span>
-          <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-purple-200 text-purple-900">
-            9
-          </span>
-        </button>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-2 text-xs font-bold">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setActiveTab('pending_rules')}
+            className={`px-3.5 py-2 rounded-xl transition cursor-pointer flex items-center gap-2 ${
+              activeTab === 'pending_rules'
+                ? 'bg-purple-100 text-purple-900 font-extrabold shadow-xs'
+                : 'text-slate-600 hover:bg-slate-100'
+            }`}
+          >
+            <Scale className="w-4 h-4" />
+            <span>Quy tắc Chờ GVCN Phê Duyệt ({unresolvedCount}/{pendingRules.length})</span>
+            <span
+              className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                unresolvedCount > 0
+                  ? 'bg-purple-200 text-purple-900'
+                  : 'bg-emerald-200 text-emerald-900'
+              }`}
+            >
+              {unresolvedCount > 0 ? `${unresolvedCount} chưa duyệt` : 'Đã duyệt xong! 🎉'}
+            </span>
+          </button>
 
-        <button
-          onClick={() => setActiveTab('conduct_catalog')}
-          className={`px-3.5 py-2 rounded-xl transition cursor-pointer flex items-center gap-2 ${
-            activeTab === 'conduct_catalog'
-              ? 'bg-blue-100 text-blue-900 font-extrabold shadow-xs'
-              : 'text-slate-600 hover:bg-slate-100'
-          }`}
-        >
-          <BookOpen className="w-4 h-4" />
-          <span>Biểu điểm & Quy định Nề nếp (24 Mục)</span>
-          <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-blue-200 text-blue-900">
-            {conductCatalog.length}
-          </span>
-        </button>
+          <button
+            onClick={() => setActiveTab('conduct_catalog')}
+            className={`px-3.5 py-2 rounded-xl transition cursor-pointer flex items-center gap-2 ${
+              activeTab === 'conduct_catalog'
+                ? 'bg-blue-100 text-blue-900 font-extrabold shadow-xs'
+                : 'text-slate-600 hover:bg-slate-100'
+            }`}
+          >
+            <BookOpen className="w-4 h-4" />
+            <span>Biểu điểm & Quy định Nề nếp ({conductCatalog.length} Mục)</span>
+          </button>
+        </div>
+
+        {canManageRules && activeTab === 'pending_rules' && unresolvedCount > 0 && (
+          <button
+            type="button"
+            onClick={handleApproveAllPending}
+            className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl shadow-sm transition active:scale-95 cursor-pointer flex items-center gap-1.5 self-start sm:self-auto shrink-0"
+          >
+            <CheckCircle2 className="w-4 h-4" />
+            <span>⚡ Phê duyệt đồng loạt {unresolvedCount} quy tắc còn lại</span>
+          </button>
+        )}
       </div>
 
-      {/* TAB 1: 9 Pending Rules */}
+      {/* TAB 1: Pending Rules */}
       {activeTab === 'pending_rules' && (
         <div className="space-y-4">
-          {/* Categories Clarity Banner */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
-            <div className="p-3.5 bg-blue-50/70 rounded-xl border border-blue-200 space-y-1">
-              <div className="font-bold text-blue-900 flex items-center gap-1.5">
-                <BookOpen className="w-3.5 h-3.5" />
-                A. NGUỒN NỘI QUY CHÍNH THỨC
+          {/* Status Overview Banner */}
+          {unresolvedCount === 0 ? (
+            <div className="p-4 bg-emerald-50 border border-emerald-300 rounded-2xl flex items-center gap-3 text-emerald-950 text-xs shadow-xs">
+              <CheckCircle2 className="w-6 h-6 text-emerald-600 shrink-0" />
+              <div>
+                <div className="font-extrabold text-sm text-emerald-900">
+                  🎉 TẤT CẢ QUY TẮC NỀ NẾP ĐÃ ĐƯỢC PHÊ DUYỆT HOÀN TẤT!
+                </div>
+                <div className="text-emerald-800 mt-0.5">
+                  Giáo viên Chủ nhiệm và Ban Cán sự đã phê duyệt chính thức toàn bộ {pendingRules.length}/{pendingRules.length} quy tắc nề nếp. Tất cả đã có hiệu lực thi hành cho Lớp 10A16.
+                </div>
               </div>
-              <p className="text-blue-800 text-[11px]">
-                Căn cứ văn bản QĐ 525/QĐ-THPT.VTT và Điều 8 Thông tư 22/2021/TT-BGDĐT.
-              </p>
             </div>
-            <div className="p-3.5 bg-amber-50/70 rounded-xl border border-amber-200 space-y-1">
-              <div className="font-bold text-amber-900 flex items-center gap-1.5">
-                <ShieldCheck className="w-3.5 h-3.5" />
-                B. NGUYÊN TẮC AN TOÀN SƯ PHẠM
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+              <div className="p-3.5 bg-blue-50/70 rounded-xl border border-blue-200 space-y-1">
+                <div className="font-bold text-blue-900 flex items-center gap-1.5">
+                  <BookOpen className="w-3.5 h-3.5" />
+                  A. NGUỒN NỘI QUY CHÍNH THỨC
+                </div>
+                <p className="text-blue-800 text-[11px]">
+                  Căn cứ văn bản QĐ 525/QĐ-THPT.VTT và Điều 8 Thông tư 22/2021/TT-BGDĐT.
+                </p>
               </div>
-              <p className="text-amber-800 text-[11px]">
-                Không tự động gộp vi phạm, kiểm soát kẹp trần, đảm bảo tính công bằng minh bạch.
-              </p>
-            </div>
-            <div className="p-3.5 bg-purple-50/70 rounded-xl border border-purple-200 space-y-1">
-              <div className="font-bold text-purple-900 flex items-center gap-1.5">
-                <Award className="w-3.5 h-3.5" />
-                C. THẨM QUYỀN BAN CÁN SỰ & GVCN
+              <div className="p-3.5 bg-amber-50/70 rounded-xl border border-amber-200 space-y-1">
+                <div className="font-bold text-amber-900 flex items-center gap-1.5">
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  B. NGUYÊN TẮC AN TOÀN SƯ PHẠM
+                </div>
+                <p className="text-amber-800 text-[11px]">
+                  Không tự động gộp vi phạm, kiểm soát kẹp trần, đảm bảo tính công bằng minh bạch.
+                </p>
               </div>
-              <p className="text-purple-800 text-[11px]">
-                GVCN, Lớp phó, Lớp trưởng có quyền thống nhất điều chỉnh và phê duyệt hiệu lực.
-              </p>
+              <div className="p-3.5 bg-purple-50/70 rounded-xl border border-purple-200 space-y-1">
+                <div className="font-bold text-purple-900 flex items-center gap-1.5">
+                  <Award className="w-3.5 h-3.5" />
+                  C. THẨM QUYỀN BAN CÁN SỰ &amp; GVCN
+                </div>
+                <p className="text-purple-800 text-[11px]">
+                  GVCN, Lớp phó, Lớp trưởng có quyền thống nhất điều chỉnh và phê duyệt hiệu lực.
+                </p>
+              </div>
             </div>
-          </div>
+          )}
 
-          {/* List of 9 Pending Rules */}
+          {/* List of Pending Rules */}
           <div className="grid grid-cols-1 gap-4">
             {pendingRules.map((rule) => {
               const isResolved = rule.status === 'confirmed_by_gvcn';
@@ -247,13 +310,13 @@ export const PendingRulesPage: React.FC = () => {
                   key={rule.code}
                   className={`p-5 rounded-2xl border transition shadow-xs space-y-3 ${
                     isResolved
-                      ? 'bg-white border-emerald-300'
+                      ? 'bg-emerald-50/30 border-emerald-300'
                       : 'bg-white border-slate-200 hover:border-purple-300'
                   }`}
                 >
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
                     <div className="flex items-center gap-2">
-                      <span className="font-mono text-xs font-black px-2 py-0.5 rounded bg-purple-100 text-purple-900">
+                      <span className={`font-mono text-xs font-black px-2 py-0.5 rounded ${isResolved ? 'bg-emerald-100 text-emerald-900' : 'bg-purple-100 text-purple-900'}`}>
                         {rule.code}
                       </span>
                       <h3 className="font-bold text-sm text-slate-900">{rule.title}</h3>
@@ -264,7 +327,7 @@ export const PendingRulesPage: React.FC = () => {
                       </span>
                       <StatusBadge
                         type={isResolved ? 'Đã duyệt' : 'Chờ xác nhận quy tắc'}
-                        label={isResolved ? 'Đã ban hành' : 'Chờ điều chỉnh'}
+                        label={isResolved ? 'Đã phê duyệt' : 'Chờ GVCN chốt'}
                       />
                     </div>
                   </div>
@@ -298,24 +361,39 @@ export const PendingRulesPage: React.FC = () => {
                   </div>
 
                   {isResolved && (
-                    <div className="text-[11px] bg-emerald-50 p-2.5 rounded-lg border border-emerald-200 text-emerald-900 flex flex-wrap items-center justify-between gap-2">
+                    <div className="text-[11px] bg-emerald-100/60 p-2.5 rounded-xl border border-emerald-300 text-emerald-950 flex flex-wrap items-center justify-between gap-2">
                       <div>
-                        <strong>Căn cứ nề nếp: </strong> {rule.basis || 'Đồng thuận theo thực tế sư phạm'} (Hiệu lực: {rule.effective_from})
+                        <strong>✅ Căn cứ phê duyệt chính thức: </strong> {rule.basis || 'Đồng thuận theo thực tế sư phạm Lớp 10A16'} (Hiệu lực: {rule.effective_from})
                       </div>
-                      <div className="text-emerald-700 font-mono text-[10px]">
-                        Xác nhận: {rule.confirmed_by}
+                      <div className="text-emerald-800 font-mono text-[10px] font-bold">
+                        Đã duyệt bởi: {rule.confirmed_by || 'GVCN'}
                       </div>
                     </div>
                   )}
 
                   {canManageRules && (
-                    <div className="pt-2 flex justify-end">
+                    <div className="pt-2 flex flex-wrap items-center justify-end gap-2 border-t border-slate-100">
+                      {!isResolved && (
+                        <button
+                          type="button"
+                          onClick={() => handleQuickApprove(rule)}
+                          className="px-3.5 py-1.5 text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl shadow-xs transition active:scale-95 cursor-pointer flex items-center gap-1.5"
+                        >
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          <span>Phê duyệt nhanh ngay</span>
+                        </button>
+                      )}
                       <button
+                        type="button"
                         onClick={() => handleOpenConfig(rule)}
-                        className="px-3.5 py-1.5 text-xs font-bold bg-purple-600 hover:bg-purple-500 text-white rounded-lg shadow-xs transition active:scale-95 cursor-pointer flex items-center gap-1.5"
+                        className={`px-3.5 py-1.5 text-xs font-bold rounded-xl shadow-xs transition active:scale-95 cursor-pointer flex items-center gap-1.5 ${
+                          isResolved
+                            ? 'bg-blue-600 hover:bg-blue-500 text-white'
+                            : 'bg-purple-600 hover:bg-purple-500 text-white'
+                        }`}
                       >
                         <FileEdit className="w-3.5 h-3.5" />
-                        <span>{isResolved ? 'Điều chỉnh phương án' : 'Phê duyệt & Điều chỉnh quy tắc'}</span>
+                        <span>{isResolved ? 'Chỉnh sửa phương án' : 'Phê duyệt & Tùy chỉnh'}</span>
                       </button>
                     </div>
                   )}
@@ -475,8 +553,7 @@ export const PendingRulesPage: React.FC = () => {
                 </label>
                 <textarea
                   rows={2}
-                  required
-                  placeholder="Ghi rõ căn cứ (Ví dụ: Thống nhất tại cuộc họp Ban Cán sự & GVCN đầu năm...)"
+                  placeholder="Ghi căn cứ (hoặc để trống để dùng căn cứ mặc định theo thẩm quyền GVCN)..."
                   value={basis}
                   onChange={(e) => setBasis(e.target.value)}
                   className="w-full p-2.5 border rounded-xl border-slate-300 focus:ring-2 focus:ring-purple-500 outline-none"

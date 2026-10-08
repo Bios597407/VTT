@@ -51,10 +51,10 @@ export function App() {
 
   const pendingIncidentsCount = appState.incidents.filter((i) => i.incident_status === 'pending_verification').length;
   const pendingRewardsCount = appState.rewards.filter((r) => r.status === 'pending').length;
-  const unresolvedRulesCount = appState.pendingRules.filter((r) => r.status === 'unresolved').length;
+  const unresolvedRulesCount = appState.pendingRules.filter((r) => r.status !== 'confirmed_by_gvcn').length;
 
   const RESTRICTED_TABS: Record<string, { label: string; minRole: 'officer' | 'gvcn' }> = {
-    pending_rules: { label: '9 Quy tắc chờ GVCN', minRole: 'officer' },
+    pending_rules: { label: 'Quy tắc chờ GVCN', minRole: 'officer' },
     period_locks: { label: 'Khóa / Mở kỳ đánh giá', minRole: 'officer' },
     audit: { label: 'Nhật ký kiểm toán', minRole: 'officer' },
     settings: { label: 'Cài đặt & Cơ sở dữ liệu', minRole: 'gvcn' },
