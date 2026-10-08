@@ -23,6 +23,28 @@ export interface WeeklyScoreResult {
 }
 
 /**
+ * Maps a YYYY-MM-DD date string to academic week number (1 to 36).
+ * School Year 2026-2027 Semester 1 starts on Monday, September 7, 2026.
+ */
+export function getWeekNumberForDate(dateStr?: string | null): number {
+  if (!dateStr || typeof dateStr !== 'string') return 1;
+  const cleanDate = dateStr.trim();
+  if (!cleanDate) return 1;
+
+  const d = new Date(cleanDate + 'T00:00:00');
+  if (isNaN(d.getTime())) return 1;
+
+  // Monday Sep 7, 2026 is Week 1
+  const termStart = new Date('2026-09-07T00:00:00');
+  const diffMs = d.getTime() - termStart.getTime();
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+  if (diffDays < 0) return 1;
+  const weekNum = Math.floor(diffDays / 7) + 1;
+  return Math.max(1, Math.min(36, weekNum));
+}
+
+/**
  * Calculate weekly conduct score.
  * Base score = 8 points.
  * official_week_score = min(10, max(0, raw_week_score)).

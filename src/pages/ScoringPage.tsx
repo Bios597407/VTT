@@ -8,6 +8,7 @@ import {
   determineBaseConductLevel,
   applySemesterRestrictions,
   calculateAnnualConduct,
+  getWeekNumberForDate,
 } from '../domain/scoring/scoringEngine';
 import { tallyAttendance } from '../domain/attendance/attendanceRules';
 import { ExcelService } from '../services/excelService';
@@ -215,7 +216,11 @@ export const ScoringPage: React.FC = () => {
                     const snap = weeklySnapshots.find(
                       (s) => s.student_id === stu.id && s.week_number === selectedWeek && s.is_current
                     );
-                    const stuIncidents = incidents.filter((i) => i.student_id === stu.id && i.incident_status === 'approved');
+                    const stuIncidents = incidents.filter((i) => {
+                      if (i.student_id !== stu.id || i.incident_status !== 'approved') return false;
+                      const incWeek = getWeekNumberForDate(i.date);
+                      return incWeek === selectedWeek;
+                    });
 
                     return (
                       <tr key={stu.id} className="hover:bg-slate-50">

@@ -26,6 +26,7 @@ import { PRIVATE_ROSTER_10A16 } from '../lib/privateRosterLoader';
 import { OFFICIAL_PENDING_RULES } from '../domain/scoring/pendingRules';
 import {
   calculateWeeklyScore,
+  getWeekNumberForDate,
 } from '../domain/scoring/scoringEngine';
 import { OFFICIAL_CONDUCT_CATALOG, ConductCatalogItem, formatIncidentDeductionRationale } from '../domain/incidents/conductCatalog';
 import { isSupabaseConfigured, supabase } from '../lib/supabaseClient';
@@ -2136,47 +2137,63 @@ class AppStateService {
 
   // --- Scoring & Snapshot Calculations ---
   public calculateAllWeeklyScores(weekNumber: number = 1) {
-    const weekId = `W${weekNumber.toString().padStart(2, '0')}`;
-    const isLocked = Boolean(this.periodLocks[`week-${weekId}`]?.is_locked);
+    // Calculate for target week OR all weeks if 0 passed
+    const weeksToCalculate = weekNumber > 0 ? [weekNumber] : Array.from({ length: 36 }, (_, i) => i + 1);
 
-    const newSnapshots: WeekScoreSnapshot[] = [];
+    for (const wNum of weeksToCalculate) {
+      const weekId = `W${wNum.toString().padStart(2, '0')}`;
+      const isLocked = Boolean(this.periodLocks[`week-${weekId}`]?.is_locked);
+      const newSnapshots: WeekScoreSnapshot[] = [];
 
-    for (const student of this.students) {
-      const stuIncidents = this.incidents.filter((i) => i.student_id === student.id);
-      const stuRewards = this.rewards.filter((r) => r.student_id === student.id);
+      for (const student of this.students) {
+        // Filter incidents strictly belonging to this week based on incident date or week_number
+        const stuIncidents = this.incidents.filter((i) => {
+          if (i.student_id !== student.id) return false;
+          const incWeek = getWeekNumberForDate(i.date);
+          return incWeek === wNum;
+        });
 
-      const scoreResult = calculateWeeklyScore({
-        isCalculated: true,
-        incidents: stuIncidents,
-        rewards: stuRewards,
-      });
+        // Filter rewards strictly belonging to this week
+        const stuRewards = this.rewards.filter((r) => {
+          if (r.student_id !== student.id) return false;
+          const rewWeek = getWeekNumberForDate(r.date);
+          return rewWeek === wNum;
+        });
 
-      const existingSnap = this.weeklySnapshots.find((s) => s.student_id === student.id && s.week_id === weekId && s.is_current);
-      const revisionNo = existingSnap ? existingSnap.revision_no + 1 : 1;
+        const scoreResult = calculateWeeklyScore({
+          isCalculated: true,
+          incidents: stuIncidents,
+          rewards: stuRewards,
+        });
 
-      if (existingSnap) {
-        existingSnap.is_current = false;
+        const existingSnap = this.weeklySnapshots.find((s) => s.student_id === student.id && s.week_id === weekId && s.is_current);
+        const revisionNo = existingSnap ? existingSnap.revision_no + 1 : 1;
+
+        if (existingSnap) {
+          existingSnap.is_current = false;
+        }
+
+        newSnapshots.push({
+          id: `snap-w-${student.id}-${weekId}-r${revisionNo}`,
+          student_id: student.id,
+          week_id: weekId,
+          week_number: wNum,
+          revision_no: revisionNo,
+          is_current: true,
+          raw_week_score: scoreResult.raw_week_score,
+          official_week_score: scoreResult.official_week_score,
+          reward_points: scoreResult.total_rewards,
+          deduction_points: scoreResult.total_deductions,
+          incidents_count: scoreResult.eligible_incidents_count,
+          rewards_count: scoreResult.eligible_rewards_count,
+          status: isLocked ? 'locked' : 'calculated',
+          calculated_at: new Date().toISOString(),
+        });
       }
 
-      newSnapshots.push({
-        id: `snap-w-${student.id}-${weekId}-r${revisionNo}`,
-        student_id: student.id,
-        week_id: weekId,
-        week_number: weekNumber,
-        revision_no: revisionNo,
-        is_current: true,
-        raw_week_score: scoreResult.raw_week_score,
-        official_week_score: scoreResult.official_week_score,
-        reward_points: scoreResult.total_rewards,
-        deduction_points: scoreResult.total_deductions,
-        incidents_count: scoreResult.eligible_incidents_count,
-        rewards_count: scoreResult.eligible_rewards_count,
-        status: isLocked ? 'locked' : 'calculated',
-        calculated_at: new Date().toISOString(),
-      });
+      this.weeklySnapshots = [...this.weeklySnapshots.filter((s) => !(s.is_current && s.week_number === wNum)), ...newSnapshots];
     }
 
-    this.weeklySnapshots = [...this.weeklySnapshots.filter((s) => !s.is_current), ...newSnapshots];
     this.notify();
   }
 
