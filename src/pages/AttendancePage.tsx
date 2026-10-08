@@ -231,7 +231,9 @@ export const AttendancePage: React.FC<Props> = ({ onOpenQuickAttendance }) => {
                   </div>
                   <StatusBadge
                     type={
-                      record.status === 'permitted_absence'
+                      record.status === 'present'
+                        ? 'present'
+                        : record.status === 'permitted_absence'
                         ? 'tot'
                         : record.status === 'unpermitted_absence'
                         ? 'rejected'
@@ -240,7 +242,9 @@ export const AttendancePage: React.FC<Props> = ({ onOpenQuickAttendance }) => {
                         : 'pending_verification'
                     }
                     label={
-                      record.status === 'permitted_absence'
+                      record.status === 'present'
+                        ? 'Có mặt'
+                        : record.status === 'permitted_absence'
                         ? 'Vắng có phép'
                         : record.status === 'unpermitted_absence'
                         ? 'Vắng K.phép'
@@ -339,7 +343,9 @@ export const AttendancePage: React.FC<Props> = ({ onOpenQuickAttendance }) => {
                       <td className="py-3 px-4">
                         <StatusBadge
                           type={
-                            record.status === 'permitted_absence'
+                            record.status === 'present'
+                              ? 'present'
+                              : record.status === 'permitted_absence'
                               ? 'tot'
                               : record.status === 'unpermitted_absence'
                               ? 'rejected'
@@ -348,7 +354,9 @@ export const AttendancePage: React.FC<Props> = ({ onOpenQuickAttendance }) => {
                               : 'pending_verification'
                           }
                           label={
-                            record.status === 'permitted_absence'
+                            record.status === 'present'
+                              ? 'Có mặt'
+                              : record.status === 'permitted_absence'
                               ? 'Vắng có phép'
                               : record.status === 'unpermitted_absence'
                               ? 'Vắng K.phép'

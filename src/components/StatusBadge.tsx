@@ -39,6 +39,13 @@ export const StatusBadge: React.FC<Props> = ({
   let defaultLabel = label || type;
 
   switch (type) {
+    case 'present':
+    case 'Có mặt':
+      dotColor = 'bg-emerald-500';
+      textColor = 'text-emerald-800';
+      bgColor = 'bg-emerald-50/80 border-emerald-200/80 font-bold';
+      defaultLabel = label || 'Có mặt';
+      break;
     case 'pending_verification':
     case 'Chờ xác minh':
       dotColor = 'bg-amber-500';
