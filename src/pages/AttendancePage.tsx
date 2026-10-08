@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { appState } from '../services/appStateService';
 import { StatusBadge } from '../components/StatusBadge';
 import { tallyAttendance, OFFICIAL_SESSIONS, ABSENCE_PROCEDURES } from '../domain/attendance/attendanceRules';
+import { AttendanceStatus } from '../types';
 import {
   CalendarCheck,
   Plus,
@@ -11,6 +12,10 @@ import {
   Search,
   Filter,
   FileText,
+  Zap,
+  Check,
+  CheckCircle2,
+  X,
 } from 'lucide-react';
 
 interface Props {
@@ -20,10 +25,19 @@ interface Props {
 export const AttendancePage: React.FC<Props> = ({ onOpenQuickAttendance }) => {
   const attendance = appState.attendance;
   const students = appState.students;
+  const currentUser = appState.currentUser;
+
+  const canManageAttendance =
+    Boolean(currentUser.isAuthenticatedOfficer) &&
+    (currentUser.role === 'gvcn' ||
+      currentUser.role === 'lop_truong' ||
+      currentUser.role === 'lop_pho');
 
   const [dateFilter, setDateFilter] = useState('');
   const [sessionFilter, setSessionFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+
+  const pendingList = attendance.filter((a) => a.status === 'absence_pending_verification');
 
   const filtered = attendance.filter((a) => {
     if (dateFilter && a.date !== dateFilter) return false;
@@ -112,6 +126,42 @@ export const AttendancePage: React.FC<Props> = ({ onOpenQuickAttendance }) => {
         </div>
       </div>
 
+      {/* 1-TOUCH PENDING VERIFICATION ACTION BANNER */}
+      {pendingList.length > 0 && canManageAttendance && (
+        <div className="bg-gradient-to-r from-amber-500 via-amber-600 to-orange-600 text-slate-950 p-4 sm:p-5 rounded-2xl shadow-md border border-amber-300 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-in fade-in zoom-in-95 duration-150">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-slate-950 text-amber-400 flex items-center justify-center font-black shrink-0 shadow-xs">
+              <Zap className="w-5 h-5 text-amber-400" />
+            </div>
+            <div>
+              <div className="font-black text-sm text-slate-950 tracking-tight flex items-center gap-2">
+                <span>Phát hiện {pendingList.length} hồ sơ điểm danh đang ở trạng thái "Chờ xác minh"!</span>
+              </div>
+              <p className="text-xs font-semibold text-slate-900 mt-0.5">
+                Bấm 1-chạm bên phải để duyệt tức thời chuyển tất cả thành Có mặt hoặc Vắng có phép!
+              </p>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 shrink-0 self-stretch sm:self-auto">
+            <button
+              type="button"
+              onClick={() => appState.approveAllPendingAttendance('present')}
+              className="flex-1 sm:flex-none px-4 py-2 bg-slate-950 hover:bg-slate-900 text-white font-black text-xs rounded-xl shadow-xs transition active:scale-95 cursor-pointer flex items-center justify-center gap-1.5"
+            >
+              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+              <span>⚡ 1-Chạm: Duyệt Tất Cả Có Mặt</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => appState.approveAllPendingAttendance('permitted_absence')}
+              className="flex-1 sm:flex-none px-3.5 py-2 bg-white hover:bg-amber-50 text-slate-950 font-bold text-xs rounded-xl border border-slate-300 shadow-xs transition active:scale-95 cursor-pointer flex items-center justify-center gap-1.5"
+            >
+              <span>🔵 Vắng có phép</span>
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Filters Bar */}
       <div className="flex flex-wrap items-center gap-2 bg-white p-3 rounded-xl border border-slate-200 text-xs">
         <div className="flex items-center gap-1.5 text-slate-500 font-semibold">
@@ -170,7 +220,7 @@ export const AttendancePage: React.FC<Props> = ({ onOpenQuickAttendance }) => {
             return (
               <div
                 key={record.id}
-                className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs space-y-2 text-xs"
+                className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs space-y-2.5 text-xs"
               >
                 <div className="flex items-center justify-between">
                   <div>
@@ -212,9 +262,30 @@ export const AttendancePage: React.FC<Props> = ({ onOpenQuickAttendance }) => {
                   </span>
                 </div>
 
-                {record.vnedu_ref_number && (
-                  <div className="text-[10px] text-slate-400 font-mono">
-                    Mã VnEdu: {record.vnedu_ref_number}
+                {canManageAttendance && (
+                  <div className="flex items-center gap-1.5 pt-2 border-t border-slate-100 flex-wrap">
+                    <span className="text-[10px] font-bold text-slate-500">1-Chạm duyệt:</span>
+                    <button
+                      type="button"
+                      onClick={() => appState.updateAttendanceStatus(record.id, 'present')}
+                      className="px-2 py-1 bg-emerald-600 text-white rounded-lg text-[10px] font-bold shadow-2xs"
+                    >
+                      ✓ Có mặt
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => appState.updateAttendanceStatus(record.id, 'permitted_absence')}
+                      className="px-2 py-1 bg-blue-600 text-white rounded-lg text-[10px] font-bold shadow-2xs"
+                    >
+                      🔵 Vắng phép
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => appState.updateAttendanceStatus(record.id, 'unpermitted_absence')}
+                      className="px-2 py-1 bg-rose-600 text-white rounded-lg text-[10px] font-bold shadow-2xs"
+                    >
+                      🔴 K.Phép
+                    </button>
                   </div>
                 )}
               </div>
@@ -233,10 +304,12 @@ export const AttendancePage: React.FC<Props> = ({ onOpenQuickAttendance }) => {
                 <th className="py-3 px-4">Buổi</th>
                 <th className="py-3 px-4">Mã số</th>
                 <th className="py-3 px-4">Họ và tên</th>
-                <th className="py-3 px-4">Trạng thái chuyên cần</th>
+                <th className="py-3 px-4">Trạng thái hiện tại</th>
+                <th className="py-3 px-4 bg-amber-50/60 text-slate-900 border-x border-amber-200">
+                  ⚡ 1-Chạm Duyệt &amp; Đổi Trạng Thái
+                </th>
                 <th className="py-3 px-4">Giờ đến / Chi tiết</th>
                 <th className="py-3 px-4">Mã VnEdu</th>
-                <th className="py-3 px-4">Miễn trừ Tốt</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -249,8 +322,10 @@ export const AttendancePage: React.FC<Props> = ({ onOpenQuickAttendance }) => {
               ) : (
                 filtered.map((record) => {
                   const student = students.find((s) => s.id === record.student_id);
+                  const isPending = record.status === 'absence_pending_verification';
+
                   return (
-                    <tr key={record.id} className="hover:bg-slate-50/80">
+                    <tr key={record.id} className={`hover:bg-slate-50/80 ${isPending ? 'bg-amber-50/30' : ''}`}>
                       <td className="py-3 px-4 font-mono font-medium text-slate-700">{record.date}</td>
                       <td className="py-3 px-4">
                         <span className="font-semibold text-slate-700">
@@ -285,6 +360,65 @@ export const AttendancePage: React.FC<Props> = ({ onOpenQuickAttendance }) => {
                           }
                         />
                       </td>
+
+                      {/* 1-TOUCH DIRECT ACTION BUTTONS CELL */}
+                      <td className="py-2.5 px-4 bg-amber-50/20 border-x border-amber-200">
+                        {canManageAttendance ? (
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <button
+                              type="button"
+                              onClick={() => appState.updateAttendanceStatus(record.id, 'present')}
+                              className={`px-2.5 py-1 rounded-lg text-[11px] font-extrabold transition shadow-2xs cursor-pointer active:scale-95 ${
+                                record.status === 'present'
+                                  ? 'bg-emerald-600 text-white ring-2 ring-emerald-400'
+                                  : 'bg-emerald-100 hover:bg-emerald-200 text-emerald-900 border border-emerald-300'
+                              }`}
+                              title="1-Chạm xác nhận Có mặt đầy đủ"
+                            >
+                              ✓ Có mặt
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => appState.updateAttendanceStatus(record.id, 'permitted_absence')}
+                              className={`px-2.5 py-1 rounded-lg text-[11px] font-extrabold transition shadow-2xs cursor-pointer active:scale-95 ${
+                                record.status === 'permitted_absence'
+                                  ? 'bg-blue-600 text-white ring-2 ring-blue-400'
+                                  : 'bg-blue-100 hover:bg-blue-200 text-blue-900 border border-blue-300'
+                              }`}
+                              title="1-Chạm xác nhận Vắng có phép"
+                            >
+                              🔵 Có phép
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => appState.updateAttendanceStatus(record.id, 'unpermitted_absence')}
+                              className={`px-2.5 py-1 rounded-lg text-[11px] font-extrabold transition shadow-2xs cursor-pointer active:scale-95 ${
+                                record.status === 'unpermitted_absence'
+                                  ? 'bg-rose-600 text-white ring-2 ring-rose-400'
+                                  : 'bg-rose-100 hover:bg-rose-200 text-rose-900 border border-rose-300'
+                              }`}
+                              title="1-Chạm chuyển Vắng không phép"
+                            >
+                              🔴 K.Phép
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => appState.updateAttendanceStatus(record.id, 'late')}
+                              className={`px-2.5 py-1 rounded-lg text-[11px] font-extrabold transition shadow-2xs cursor-pointer active:scale-95 ${
+                                record.status === 'late'
+                                  ? 'bg-amber-500 text-slate-950 ring-2 ring-amber-300'
+                                  : 'bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300'
+                              }`}
+                              title="1-Chạm chuyển Đi trễ"
+                            >
+                              🟡 Trễ
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-[11px] text-slate-400 font-medium italic">Chỉ xem</span>
+                        )}
+                      </td>
+
                       <td className="py-3 px-4 text-slate-600">
                         {record.arrival_time && (
                           <span className="font-mono font-semibold text-amber-700 mr-2">
@@ -295,15 +429,6 @@ export const AttendancePage: React.FC<Props> = ({ onOpenQuickAttendance }) => {
                       </td>
                       <td className="py-3 px-4 font-mono text-[11px] text-slate-500">
                         {record.vnedu_ref_number || '—'}
-                      </td>
-                      <td className="py-3 px-4">
-                        {record.is_legitimate_exception ? (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">
-                            Miễn trừ ({record.exception_reason || 'Hợp lệ'})
-                          </span>
-                        ) : (
-                          <span className="text-slate-400">—</span>
-                        )}
                       </td>
                     </tr>
                   );

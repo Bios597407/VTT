@@ -12,6 +12,7 @@ import {
   PositiveNote,
   Task,
   AttendanceRecord,
+  AttendanceStatus,
   PendingRule,
   WeekScoreSnapshot,
   MonthScoreSnapshot,
@@ -1748,6 +1749,41 @@ class AppStateService {
     }
 
     return { success: true, id };
+  }
+
+  public updateAttendanceStatus(recordId: string, newStatus: AttendanceStatus) {
+    if (!this.checkWriteAuthorization()) return;
+    const rec = this.attendance.find((a) => a.id === recordId);
+    if (!rec) return;
+
+    rec.status = newStatus;
+    this.addAuditLog(this.currentUser.name, 'Cập nhật nhanh trạng thái điểm danh', 'attendance', recordId, `Trạng thái mới: ${newStatus}`);
+    this.showToast('✅ Đã cập nhật 1-chạm trạng thái điểm danh!', 'success');
+    this.notify();
+
+    if (supabase) {
+      supabase.from('attendance_records').update({ status: newStatus }).eq('id', recordId).then(({ error }) => {
+        if (error) console.error('Supabase auto-update attendance error:', error);
+      });
+    }
+  }
+
+  public approveAllPendingAttendance(targetStatus: AttendanceStatus = 'present') {
+    if (!this.checkWriteAuthorization()) return;
+    const pendingList = this.attendance.filter((a) => a.status === 'absence_pending_verification');
+    if (pendingList.length === 0) {
+      this.showToast('Không có hồ sơ điểm danh nào đang ở trạng thái chờ xác minh!', 'info');
+      return;
+    }
+
+    pendingList.forEach((a) => {
+      a.status = targetStatus;
+    });
+
+    const statusLabel = targetStatus === 'present' ? 'Có mặt đầy đủ' : targetStatus === 'permitted_absence' ? 'Vắng có phép' : 'Vắng không phép';
+    this.addAuditLog(this.currentUser.name, '1-Chạm duyệt tất cả hồ sơ điểm danh chờ xác minh', 'attendance', 'batch_approve', `Chuyển ${pendingList.length} hồ sơ thành ${statusLabel}`);
+    this.showToast(`⚡ ĐÃ 1-CHẠM DUYỆT TẤT CẢ ${pendingList.length} HỒ SƠ CHỜ XÁC MINH THÀNH: [${statusLabel.toUpperCase()}]!`, 'success');
+    this.notify();
   }
 
   // --- Incidents & Conduct Management (GVCN, Lớp phó, Lớp trưởng có toàn quyền) ---
