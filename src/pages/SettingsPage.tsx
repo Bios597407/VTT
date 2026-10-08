@@ -21,6 +21,7 @@ import {
   Plus,
   Trash2,
   Lock,
+  Edit3,
 } from 'lucide-react';
 
 export const SettingsPage: React.FC = () => {
