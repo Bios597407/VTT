@@ -139,8 +139,8 @@ class AppStateService {
     gvcn_phone: '',
     class_president_name: 'Trần Đức Anh',
     class_vice_discipline_name: 'Lê Thiên Bảo',
-    class_vice_academic_name: 'Nguyễn Gia Bảo',
-    secretary_name: 'Lý Tú Uyên',
+    class_vice_academic_name: 'Nguyễn Ngọc Gia Hân',
+    secretary_name: 'Lưu Ngọc Linh',
     slogan: 'Kỷ luật tự giác · Học tập hăng say · Tập thể vững mạnh',
     target_conduct_points: 9.0,
     notes: 'Toàn thể học sinh thực hiện nghiêm túc nề nếp và nội quy lớp học.',
@@ -159,18 +159,18 @@ class AppStateService {
     {
       id: 'acc-lt',
       role: 'lop_truong',
-      title: 'Lớp trưởng',
-      name: 'Trần Đức Anh',
+      title: 'Lớp phó Học tập',
+      name: 'Nguyễn Ngọc Gia Hân',
       email: '',
-      pin: '10A16lt',
+      pin: '10A16lpht',
     },
     {
       id: 'acc-lp',
       role: 'lop_pho',
-      title: 'Lớp phó Kỷ luật & Nề nếp',
-      name: 'Lê Thiên Bảo',
+      title: 'Bí thư Chi đoàn',
+      name: 'Lưu Ngọc Linh',
       email: '',
-      pin: '10A16lp',
+      pin: '10A16bt',
     },
   ];
 
@@ -210,9 +210,28 @@ class AppStateService {
   // Listeners for React state reactivity
   private listeners: (() => void)[] = [];
 
+  // Kích thước chữ hiển thị (Mặc định: 'large' - Lớn theo yêu cầu của GVCN)
+  public fontSize: 'normal' | 'large' | 'huge' = 'large';
+
   constructor() {
     this.initDefaultSeats();
     this.calculateAllWeeklyScores(1);
+
+    // Thiết lập kích thước chữ mặc định hoặc khôi phục từ LocalStorage
+    if (typeof window !== 'undefined') {
+      try {
+        const savedFontSize = localStorage.getItem('VTT_FONT_SIZE') as 'normal' | 'large' | 'huge';
+        if (savedFontSize === 'normal' || savedFontSize === 'large' || savedFontSize === 'huge') {
+          this.fontSize = savedFontSize;
+        } else {
+          this.fontSize = 'large';
+        }
+        document.documentElement.style.fontSize = 
+          this.fontSize === 'huge' ? '122%' : this.fontSize === 'large' ? '110%' : '100%';
+      } catch (e) {
+        this.fontSize = 'large';
+      }
+    }
 
     // Phục hồi dữ liệu cấu hình Lớp & Ban cán sự từ bộ nhớ trình duyệt nếu có
     if (typeof window !== 'undefined') {
@@ -275,6 +294,18 @@ class AppStateService {
     this.listeners.forEach((l) => l());
   }
 
+  public setFontSize(size: 'normal' | 'large' | 'huge') {
+    this.fontSize = size;
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('VTT_FONT_SIZE', size);
+        document.documentElement.style.fontSize = 
+          size === 'huge' ? '122%' : size === 'large' ? '110%' : '100%';
+      } catch (e) {}
+    }
+    this.notify();
+  }
+
   public getDataMode(): string {
     return 'official_10a16';
   }
@@ -305,12 +336,12 @@ class AppStateService {
       };
     } else if (role === 'lop_truong') {
       const studentLt = this.students.find(
-        (s) => s.full_name === this.classInfo.class_president_name
+        (s) => s.full_name === this.classInfo.class_vice_academic_name
       ) || this.students[0];
       const ltAcc = this.officerAccounts.find((a) => a.role === 'lop_truong');
       this.currentUser = {
         id: 'user-lt',
-        name: `${this.classInfo.class_president_name || studentLt?.full_name || 'Lớp trưởng'} (Lớp trưởng)`,
+        name: `${this.classInfo.class_vice_academic_name || studentLt?.full_name || 'Nguyễn Ngọc Gia Hân'} (Lớp phó Học tập)`,
         role: 'lop_truong',
         class_id: 'class-10a16',
         student_id: studentLt?.id,
@@ -319,12 +350,12 @@ class AppStateService {
       };
     } else if (role === 'lop_pho') {
       const studentLp = this.students.find(
-        (s) => s.full_name === this.classInfo.class_vice_discipline_name
+        (s) => s.full_name === this.classInfo.secretary_name
       ) || this.students[1];
       const lpAcc = this.officerAccounts.find((a) => a.role === 'lop_pho');
       this.currentUser = {
         id: 'user-lp',
-        name: `${this.classInfo.class_vice_discipline_name || studentLp?.full_name || 'Lớp phó'} (Lớp phó Kỷ luật)`,
+        name: `${this.classInfo.secretary_name || studentLp?.full_name || 'Lưu Ngọc Linh'} (Bí thư Chi đoàn)`,
         role: 'lop_pho',
         class_id: 'class-10a16',
         student_id: studentLp?.id,
@@ -366,13 +397,13 @@ class AppStateService {
     Object.assign(this.classInfo, updates);
 
     // Đồng bộ tức thời danh sách tài khoản cán sự
-    if (updates.class_president_name) {
+    if (updates.class_vice_academic_name) {
       const ltAcc = this.officerAccounts.find((a) => a.role === 'lop_truong');
-      if (ltAcc) ltAcc.name = updates.class_president_name;
+      if (ltAcc) ltAcc.name = updates.class_vice_academic_name;
     }
-    if (updates.class_vice_discipline_name) {
+    if (updates.secretary_name) {
       const lpAcc = this.officerAccounts.find((a) => a.role === 'lop_pho');
-      if (lpAcc) lpAcc.name = updates.class_vice_discipline_name;
+      if (lpAcc) lpAcc.name = updates.secretary_name;
     }
     if (updates.gvcn_name) {
       this.officerAccounts.filter((a) => a.role === 'gvcn').forEach((a) => (a.name = updates.gvcn_name!));
@@ -386,9 +417,9 @@ class AppStateService {
     if (this.currentUser.role === 'gvcn') {
       this.currentUser.name = `${this.classInfo.gvcn_name} (GVCN)`;
     } else if (this.currentUser.role === 'lop_truong') {
-      this.currentUser.name = `${this.classInfo.class_president_name} (Lớp trưởng)`;
+      this.currentUser.name = `${this.classInfo.class_vice_academic_name} (Lớp phó Học tập)`;
     } else if (this.currentUser.role === 'lop_pho') {
-      this.currentUser.name = `${this.classInfo.class_vice_discipline_name} (Lớp phó Kỷ luật)`;
+      this.currentUser.name = `${this.classInfo.secretary_name} (Bí thư Chi đoàn)`;
     }
 
     // Lưu ngay lập tức vào LocalStorage để không bao giờ bị mất dữ liệu

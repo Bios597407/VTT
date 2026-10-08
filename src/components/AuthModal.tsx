@@ -256,7 +256,7 @@ export const AuthModal: React.FC<Props> = ({ isOpen, onClose, promptMessage, onS
                     <div className="text-xs opacity-80 font-semibold mt-0.5">Toàn quyền</div>
                   </button>
 
-                  <button
+                   <button
                     type="button"
                     onClick={() => setPinRole('lop_truong')}
                     className={`py-3 px-2 rounded-xl text-sm font-bold border transition cursor-pointer text-center ${
@@ -265,8 +265,8 @@ export const AuthModal: React.FC<Props> = ({ isOpen, onClose, promptMessage, onS
                         : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
                     }`}
                   >
-                    <div className="font-black text-sm">Lớp trưởng</div>
-                    <div className="text-xs opacity-80 font-semibold mt-0.5">Ban Cán Sự</div>
+                    <div className="font-black text-sm">Lớp phó Học tập</div>
+                    <div className="text-xs opacity-80 font-semibold mt-0.5">{classInfo.class_vice_academic_name}</div>
                   </button>
 
                   <button
@@ -278,8 +278,8 @@ export const AuthModal: React.FC<Props> = ({ isOpen, onClose, promptMessage, onS
                         : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
                     }`}
                   >
-                    <div className="font-black text-sm">Lớp phó</div>
-                    <div className="text-xs opacity-80 font-semibold mt-0.5">Ban Cán Sự</div>
+                    <div className="font-black text-sm">Bí thư Chi đoàn</div>
+                    <div className="text-xs opacity-80 font-semibold mt-0.5">{classInfo.secretary_name}</div>
                   </button>
                 </div>
               </div>

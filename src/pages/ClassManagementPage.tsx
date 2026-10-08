@@ -77,8 +77,8 @@ export const ClassManagementPage: React.FC<Props> = ({ onNavigate, onOpenAuthMod
   const [isEditingPins, setIsEditingPins] = useState(false);
   const [pinForm, setPinForm] = useState({
     gvcnPin: officerAccounts.find((a) => a.role === 'gvcn')?.pin || '1016',
-    ltPin: officerAccounts.find((a) => a.role === 'lop_truong')?.pin || '10A16lt',
-    lpPin: officerAccounts.find((a) => a.role === 'lop_pho')?.pin || '10A16lp',
+    ltPin: officerAccounts.find((a) => a.role === 'lop_truong')?.pin || '10A16lpht',
+    lpPin: officerAccounts.find((a) => a.role === 'lop_pho')?.pin || '10A16bt',
   });
 
   const handleQuickGvcnLogin = (e: React.FormEvent) => {
@@ -993,7 +993,7 @@ export const ClassManagementPage: React.FC<Props> = ({ onNavigate, onOpenAuthMod
               </div>
 
               <div>
-                <label className="block font-bold text-slate-800 mb-1">Mã PIN Lớp trưởng ({classInfo.class_president_name})</label>
+                <label className="block font-bold text-slate-800 mb-1">Mã PIN Lớp phó Học tập ({classInfo.class_vice_academic_name})</label>
                 <input
                   type="text"
                   required
@@ -1004,7 +1004,7 @@ export const ClassManagementPage: React.FC<Props> = ({ onNavigate, onOpenAuthMod
               </div>
 
               <div>
-                <label className="block font-bold text-slate-800 mb-1">Mã PIN Lớp phó Kỷ luật ({classInfo.class_vice_discipline_name})</label>
+                <label className="block font-bold text-slate-800 mb-1">Mã PIN Bí thư Chi đoàn ({classInfo.secretary_name})</label>
                 <input
                   type="text"
                   required

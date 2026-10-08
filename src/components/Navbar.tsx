@@ -107,6 +107,46 @@ export const Navbar: React.FC<Props> = ({
 
           {/* Active Role & Controls - Chữ to rõ ràng, không lộ email cá nhân */}
           <div className="flex items-center gap-2.5 shrink-0">
+            {/* Bộ chuyển đổi kích thước chữ (cho chiều tao chữ lớn lên) */}
+            <div className="flex items-center gap-1 p-0.5 bg-slate-800 rounded-xl border border-slate-700">
+              <button
+                type="button"
+                onClick={() => appState.setFontSize('normal')}
+                className={`px-2 py-1.5 text-[11px] font-bold rounded-lg transition-all cursor-pointer ${
+                  appState.fontSize === 'normal'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+                title="Cỡ chữ thường"
+              >
+                A
+              </button>
+              <button
+                type="button"
+                onClick={() => appState.setFontSize('large')}
+                className={`px-2 py-1.5 text-xs font-extrabold rounded-lg transition-all cursor-pointer ${
+                  appState.fontSize === 'large'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+                title="Cỡ chữ lớn (Mặc định)"
+              >
+                A<sup>+</sup>
+              </button>
+              <button
+                type="button"
+                onClick={() => appState.setFontSize('huge')}
+                className={`px-2 py-1.5 text-sm font-black rounded-lg transition-all cursor-pointer ${
+                  appState.fontSize === 'huge'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+                title="Cỡ chữ rất lớn"
+              >
+                A<sup>++</sup>
+              </button>
+            </div>
+
             {/* If currently Student (View-only) */}
             {!isOfficer ? (
               <>

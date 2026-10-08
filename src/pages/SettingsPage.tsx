@@ -48,8 +48,8 @@ export const SettingsPage: React.FC = () => {
   }
 
   // New officer form state
-  const [newRole, setNewRole] = useState<'gvcn' | 'lop_truong' | 'lop_pho'>('lop_pho');
-  const [newTitle, setNewTitle] = useState('Lớp phó');
+  const [newRole, setNewRole] = useState<'gvcn' | 'lop_truong' | 'lop_pho'>('lop_truong');
+  const [newTitle, setNewTitle] = useState('Lớp phó Học tập');
   const [newName, setNewName] = useState('');
   const [newEmail, setNewEmail] = useState('');
   const [newPin, setNewPin] = useState('');
@@ -78,7 +78,7 @@ export const SettingsPage: React.FC = () => {
     appState.addOfficerAccount({
       id: `acc-${Date.now()}`,
       role: newRole,
-      title: newTitle || (newRole === 'gvcn' ? 'Giáo viên Chủ nhiệm' : newRole === 'lop_truong' ? 'Lớp trưởng' : 'Lớp phó'),
+      title: newTitle || (newRole === 'gvcn' ? 'Giáo viên Chủ nhiệm' : newRole === 'lop_truong' ? 'Lớp phó Học tập' : 'Bí thư Chi đoàn'),
       name: newName.trim(),
       email: newEmail.trim().toLowerCase(),
       pin: newPin.trim() || '10A16',
@@ -409,6 +409,52 @@ export const SettingsPage: React.FC = () => {
                 </label>
               </div>
             </div>
+
+            {/* Bộ cấu hình cỡ chữ trực quan (cho chiều tao chữ lớn lên) */}
+            <div className="pt-4 border-t border-slate-200 space-y-3">
+              <div className="font-bold text-slate-800 text-xs flex items-center gap-1.5">
+                <span className="text-sm">✨</span>
+                <span>Cấu hình Cỡ chữ Hệ thống (cho chiều tao chữ lớn lên):</span>
+              </div>
+              <p className="text-[11px] text-slate-500 leading-relaxed">
+                Phóng to hoặc thu nhỏ toàn bộ văn bản, các nút bấm, danh sách và bảng biểu trên mọi giao diện để phù hợp với tầm nhìn.
+              </p>
+              <div className="grid grid-cols-3 gap-2 p-1 bg-slate-100 rounded-2xl border border-slate-200 text-xs font-bold">
+                <button
+                  type="button"
+                  onClick={() => appState.setFontSize('normal')}
+                  className={`py-2 px-1 rounded-xl text-center transition-all cursor-pointer whitespace-nowrap ${
+                    appState.fontSize === 'normal'
+                      ? 'bg-blue-600 text-white shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Chữ vừa (100%)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => appState.setFontSize('large')}
+                  className={`py-2 px-1 rounded-xl text-center transition-all cursor-pointer whitespace-nowrap ${
+                    appState.fontSize === 'large'
+                      ? 'bg-blue-600 text-white shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Chữ lớn 🌟 (110%)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => appState.setFontSize('huge')}
+                  className={`py-2 px-1 rounded-xl text-center transition-all cursor-pointer whitespace-nowrap ${
+                    appState.fontSize === 'huge'
+                      ? 'bg-blue-600 text-white shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Chữ rất lớn 🔥 (122%)
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -449,7 +495,7 @@ export const SettingsPage: React.FC = () => {
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center font-black text-sm shrink-0 shadow-xs">
-                      {acc.role === 'gvcn' ? 'GV' : acc.role === 'lop_truong' ? 'LT' : 'LP'}
+                      {acc.role === 'gvcn' ? 'GV' : acc.role === 'lop_truong' ? 'HT' : 'BT'}
                     </div>
                     <div>
                       <div className="font-black text-slate-900 text-sm flex items-center gap-2">
@@ -536,8 +582,8 @@ export const SettingsPage: React.FC = () => {
                           className="w-full p-2 border rounded-lg bg-white border-slate-300 text-xs font-semibold"
                         >
                           <option value="gvcn">GVCN (Toàn quyền)</option>
-                          <option value="lop_truong">Lớp trưởng (Ban Cán Sự)</option>
-                          <option value="lop_pho">Lớp phó (Ban Cán Sự)</option>
+                          <option value="lop_truong">Lớp phó Học tập (Ban Cán Sự)</option>
+                          <option value="lop_pho">Bí thư Chi đoàn (Ban Cán Sự)</option>
                         </select>
                       </div>
 
@@ -605,13 +651,13 @@ export const SettingsPage: React.FC = () => {
                 onChange={(e) => {
                   const r = e.target.value as any;
                   setNewRole(r);
-                  setNewTitle(r === 'gvcn' ? 'Giáo viên Chủ nhiệm' : r === 'lop_truong' ? 'Lớp trưởng' : 'Lớp phó');
+                  setNewTitle(r === 'gvcn' ? 'Giáo viên Chủ nhiệm' : r === 'lop_truong' ? 'Lớp phó Học tập' : 'Bí thư Chi đoàn');
                 }}
                 className="w-full p-2 border rounded-lg bg-white border-slate-300 text-xs"
               >
                 <option value="gvcn">GVCN</option>
-                <option value="lop_truong">Lớp trưởng</option>
-                <option value="lop_pho">Lớp phó</option>
+                <option value="lop_truong">Lớp phó Học tập</option>
+                <option value="lop_pho">Bí thư Chi đoàn</option>
               </select>
             </div>
 
