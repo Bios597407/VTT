@@ -190,10 +190,19 @@ export const OFFICIAL_CONDUCT_CATALOG: ConductRuleItem[] = [
 
 /**
  * Format specific deduction rationale according to QĐ 525 regulations:
- * Example output: "-2đ vì lý do Đi học trễ mốc quy định (Mã 08): Đi trễ 10 phút"
+ * Example output: "-2đ vì lý do Đi học trễ mốc quy định (Mã 08) [Ngày 2026-10-08 · Sáng tiết 1]: Đi trễ 10 phút"
  */
 export function formatIncidentDeductionRationale(
-  inc: { conduct_code?: string | null; base_deduction?: number; effective_deduction?: number; notes?: string; other_category_description?: string },
+  inc: {
+    conduct_code?: string | null;
+    base_deduction?: number;
+    effective_deduction?: number;
+    notes?: string;
+    other_category_description?: string;
+    date?: string;
+    session?: 'morning' | 'afternoon' | string;
+    period?: number;
+  },
   catalog: ConductRuleItem[] = OFFICIAL_CONDUCT_CATALOG
 ): string {
   const points = Math.abs(
@@ -210,8 +219,18 @@ export function formatIncidentDeductionRationale(
     : 'Vi phạm nội quy';
 
   const codeStr = inc.conduct_code ? ` (Mã ${inc.conduct_code})` : '';
+
+  // Format Date & Session/Period
+  let timeStr = '';
+  if (inc.date) {
+    const sessionLabel = inc.session === 'morning' ? 'Sáng' : inc.session === 'afternoon' ? 'Chiều' : inc.session || '';
+    const periodLabel = inc.period ? ` tiết ${inc.period}` : '';
+    const timeDetail = [sessionLabel, periodLabel].filter(Boolean).join('');
+    timeStr = ` [Ngày ${inc.date}${timeDetail ? ` · ${timeDetail}` : ''}]`;
+  }
+
   const detailNotes = inc.notes || inc.other_category_description;
   const notesStr = detailNotes && detailNotes.trim() ? `: ${detailNotes.trim()}` : '';
 
-  return `-${points}đ vì lý do ${reasonName}${codeStr}${notesStr}`;
+  return `-${points}đ vì lý do ${reasonName}${codeStr}${timeStr}${notesStr}`;
 }

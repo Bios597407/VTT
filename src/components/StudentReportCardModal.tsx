@@ -269,8 +269,11 @@ export const StudentReportCardModal: React.FC<Props> = ({
                                 <span>• [Mã {inc.conduct_code || 'Khác'}] {title}</span>
                                 <span className="font-mono text-rose-700 font-extrabold">-{inc.effective_deduction}đ</span>
                               </div>
+                              <div className="text-slate-700 text-[10px] mt-0.5 font-semibold">
+                                📅 <strong>Thời gian:</strong> Ngày {inc.date} · {inc.session === 'morning' ? 'Buổi sáng' : 'Buổi chiều'}{inc.period ? ` (Tiết ${inc.period})` : ''}
+                              </div>
                               <div className="text-slate-600 text-[10px] mt-0.5">
-                                <strong>Lý do trừ điểm:</strong> {inc.notes || inc.other_category_description || 'Nhắc nhở nề nếp lớp học'}
+                                📝 <strong>Lý do trừ điểm:</strong> {inc.notes || inc.other_category_description || 'Nhắc nhở nề nếp lớp học'}
                               </div>
                             </li>
                           );
