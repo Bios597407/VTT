@@ -1052,9 +1052,11 @@ class AppStateService {
     let stuIdx = 0;
     for (let r = 1; r <= 6; r++) {
       for (let c = 1; c <= 8; c++) {
-        const colGroup = Math.ceil(c / 2);
+        const colGroup = Math.ceil(c / 2); // Cột 1..4
         const tableNum = (r - 1) * 4 + colGroup;
         const stu = this.students[stuIdx];
+        const groupId = `group-0${colGroup}`;
+        
         seats.push({
           id: `seat-${r}-${c}`,
           class_id: classId,
@@ -1063,6 +1065,12 @@ class AppStateService {
           table_number: tableNum,
           student_id: stu ? stu.id : undefined,
         });
+
+        if (stu) {
+          stu.group_id = groupId;
+          stu.seat_number = `Bàn ${tableNum} (Tổ ${colGroup} - Cột ${colGroup})`;
+        }
+
         stuIdx++;
       }
     }
@@ -1234,7 +1242,29 @@ class AppStateService {
     this.notify();
   }
 
-  // --- Seating Management (Sơ đồ chỗ ngồi) ---
+  // --- Seating Management (Sơ đồ chỗ ngồi theo Cột & Tổ) ---
+  // Tự động gán Tổ của học sinh theo Cột bàn ngồi (Cột 1: Tổ 1, Cột 2: Tổ 2, Cột 3: Tổ 3, Cột 4: Tổ 4)
+  public syncStudentGroupWithSeatColumn(studentId: string, seat: Seat) {
+    const stu = this.students.find((s) => s.id === studentId);
+    if (!stu || !seat) return;
+
+    const colGroup = Math.ceil(seat.col_number / 2); // 1, 2, 3, hoặc 4
+    const matchedGroup = this.groups.find((g) => g.group_number === colGroup) || this.groups[colGroup - 1];
+    const targetGroupId = matchedGroup ? matchedGroup.id : `group-0${colGroup}`;
+
+    stu.group_id = targetGroupId;
+    stu.seat_number = `Bàn ${seat.table_number} (Cột ${colGroup} - Tổ ${colGroup})`;
+
+    if (supabase) {
+      supabase.from('students').update({
+        group_id: stu.group_id,
+        seat_number: stu.seat_number,
+      }).eq('id', stu.id).then(({ error }) => {
+        if (error) console.error('Supabase auto update student group from column error:', error);
+      });
+    }
+  }
+
   public assignStudentToSeat(seatId: string, studentId?: string) {
     const seat = this.seats.find((s) => s.id === seatId);
     if (!seat) return;
@@ -1244,10 +1274,7 @@ class AppStateService {
           s.student_id = undefined;
         }
       });
-      const stu = this.students.find((s) => s.id === studentId);
-      if (stu) {
-        stu.seat_number = `Bàn ${seat.table_number} (Dãy ${Math.ceil(seat.col_number / 2)})`;
-      }
+      this.syncStudentGroupWithSeatColumn(studentId, seat);
     } else {
       if (seat.student_id) {
         const prevStu = this.students.find((s) => s.id === seat.student_id);
@@ -1257,7 +1284,7 @@ class AppStateService {
     seat.student_id = studentId;
     this.addAuditLog(
       this.currentUser.name,
-      'Điều chỉnh vị trí sơ đồ chỗ ngồi',
+      'Điều chỉnh vị trí sơ đồ chỗ ngồi & Đồng bộ Tổ theo Cột',
       'seat',
       seatId,
       `Bàn ${seat.table_number}`
@@ -1274,33 +1301,67 @@ class AppStateService {
     s2.student_id = tempStu;
 
     if (s1.student_id) {
-      const stu1 = this.students.find((s) => s.id === s1.student_id);
-      if (stu1) stu1.seat_number = `Bàn ${s1.table_number} (Dãy ${Math.ceil(s1.col_number / 2)})`;
+      this.syncStudentGroupWithSeatColumn(s1.student_id, s1);
     }
     if (s2.student_id) {
-      const stu2 = this.students.find((s) => s.id === s2.student_id);
-      if (stu2) stu2.seat_number = `Bàn ${s2.table_number} (Dãy ${Math.ceil(s2.col_number / 2)})`;
+      this.syncStudentGroupWithSeatColumn(s2.student_id, s2);
     }
 
-    this.addAuditLog(this.currentUser.name, 'Hoán đổi chỗ ngồi giữa 2 bàn', 'seat', `${seatId1}<->${seatId2}`);
+    this.addAuditLog(
+      this.currentUser.name,
+      'Hoán đổi chỗ ngồi giữa 2 bàn & Đồng bộ Tổ theo Cột mới',
+      'seat',
+      `${seatId1}<->${seatId2}`
+    );
     this.notify();
   }
 
   public autoArrangeSeats(method: 'by_group' | 'by_roster' = 'by_roster') {
-    const sortedStudents = [...this.students];
     if (method === 'by_group') {
-      sortedStudents.sort((a, b) => (a.group_id || '').localeCompare(b.group_id || ''));
-    }
-    this.seats.forEach((seat, idx) => {
-      const stu = sortedStudents[idx];
-      seat.student_id = stu ? stu.id : undefined;
-      if (stu) {
-        stu.seat_number = `Bàn ${seat.table_number} (Dãy ${seat.col_number <= 2 ? 1 : 2})`;
+      // Sắp xếp học sinh thuộc từng Tổ 1..4 vào các Cột bàn 1..4 tương ứng
+      const groupMap: Record<string, Student[]> = {};
+      this.groups.forEach((g) => { groupMap[g.id] = []; });
+
+      this.students.forEach((s) => {
+        const gId = s.group_id && groupMap[s.group_id] ? s.group_id : this.groups[0]?.id || 'group-01';
+        if (!groupMap[gId]) groupMap[gId] = [];
+        groupMap[gId].push(s);
+      });
+
+      // Reset all seat student assignments
+      this.seats.forEach((seat) => { seat.student_id = undefined; });
+
+      // Place students column by column (Cột 1 -> Tổ 1, Cột 2 -> Tổ 2, Cột 3 -> Tổ 3, Cột 4 -> Tổ 4)
+      for (let colGroup = 1; colGroup <= 4; colGroup++) {
+        const matchedGrp = this.groups.find((g) => g.group_number === colGroup) || this.groups[colGroup - 1];
+        const grpStudents = matchedGrp && groupMap[matchedGrp.id] ? groupMap[matchedGrp.id] : [];
+        const colSeats = this.seats
+          .filter((s) => Math.ceil(s.col_number / 2) === colGroup)
+          .sort((a, b) => a.table_number - b.table_number || a.col_number - b.col_number);
+
+        colSeats.forEach((seat, idx) => {
+          const stu = grpStudents[idx];
+          if (stu) {
+            seat.student_id = stu.id;
+            this.syncStudentGroupWithSeatColumn(stu.id, seat);
+          }
+        });
       }
-    });
+    } else {
+      // Xếp theo STT Danh sách 43 HS và tự động gán Tổ theo Cột chỗ ngồi
+      const sortedStudents = [...this.students].sort((a, b) => a.student_code.localeCompare(b.student_code));
+      this.seats.forEach((seat, idx) => {
+        const stu = sortedStudents[idx];
+        seat.student_id = stu ? stu.id : undefined;
+        if (stu) {
+          this.syncStudentGroupWithSeatColumn(stu.id, seat);
+        }
+      });
+    }
+
     this.addAuditLog(
       this.currentUser.name,
-      'Sắp xếp tự động lại toàn bộ sơ đồ chỗ ngồi',
+      'Sắp xếp tự động toàn bộ sơ đồ chỗ ngồi & Đồng bộ Tổ theo Cột',
       'seating',
       'class-10a16',
       `Phương pháp: ${method}`

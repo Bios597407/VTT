@@ -607,6 +607,17 @@ export const SeatingPage: React.FC = () => {
           </p>
         </div>
 
+        {/* COLUMN TO GROUP DIRECTIVE BANNER */}
+        <div className="bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 p-3 rounded-xl text-white text-xs font-semibold flex flex-col sm:flex-row items-center justify-between gap-2 shadow-xs">
+          <div className="flex items-center gap-2">
+            <span className="px-2 py-0.5 bg-amber-400 text-slate-950 font-black rounded-md text-[11px] uppercase">⚡ Quy tắc Cột = Tổ</span>
+            <span className="text-slate-200 text-[11px]">4 Cột bàn từ trái sang phải tương ứng đúng 4 Tổ (Cột 1 = Tổ 1, Cột 2 = Tổ 2, Cột 3 = Tổ 3, Cột 4 = Tổ 4)</span>
+          </div>
+          <span className="text-[11px] text-amber-300 font-bold italic shrink-0">
+            🔄 Khi thay đổi vị trí chỗ ngồi sang cột khác, Tổ của học sinh sẽ tự động chuyển theo!
+          </span>
+        </div>
+
         {/* TOP CLASSROOM PODIUM & ENVIRONMENT FRAME */}
         <div className="grid grid-cols-12 gap-2 text-xs font-bold text-slate-700">
           {/* Left Door Indicator */}
@@ -1150,7 +1161,9 @@ const TableCard: React.FC<TableCardProps> = ({
           <span className="bg-slate-900 text-white font-mono px-2 py-0.5 rounded text-[11px]">
             BÀN {table.tableNumber}
           </span>
-          <span className="text-[10px] text-slate-500 font-mono">Dãy {table.colGroupNumber}</span>
+          <span className="text-[10px] text-blue-900 bg-blue-100 font-bold px-1.5 py-0.5 rounded border border-blue-200 font-mono">
+            Cột {table.colGroupNumber} · Tổ {table.colGroupNumber}
+          </span>
         </div>
         <span className="text-[10px] text-slate-400 font-medium">(2 HS/Bàn)</span>
       </div>
