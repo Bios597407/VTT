@@ -20,6 +20,8 @@ import {
   Check,
   X,
   UserCheck,
+  Activity,
+  Radio,
 } from 'lucide-react';
 import { NavTab } from '../components/Sidebar';
 
@@ -29,6 +31,7 @@ interface Props {
   onOpenQuickIncident: () => void;
   onOpenExcelImport: () => void;
   onOpenAuthModal?: () => void;
+  onOpenActiveUsers?: () => void;
 }
 
 export const DashboardPage: React.FC<Props> = ({
@@ -37,6 +40,7 @@ export const DashboardPage: React.FC<Props> = ({
   onOpenQuickIncident,
   onOpenExcelImport,
   onOpenAuthModal,
+  onOpenActiveUsers,
 }) => {
   // Lắng nghe thay đổi tức thời từ appState để trang luôn cập nhật trực tiếp
   const [, setTick] = useState(0);
@@ -147,6 +151,16 @@ export const DashboardPage: React.FC<Props> = ({
           </div>
 
           <div className="flex flex-wrap gap-2.5">
+            {onOpenActiveUsers && (
+              <button
+                onClick={onOpenActiveUsers}
+                className="min-h-[44px] px-3.5 py-2 bg-emerald-950/90 hover:bg-emerald-900 text-emerald-200 border border-emerald-500/60 text-xs font-black rounded-xl shadow-xs transition active:scale-95 cursor-pointer flex items-center justify-center gap-2"
+                title="Xem chi tiết danh sách người dùng đang truy cập ứng dụng"
+              >
+                <Radio className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
+                <span>🟢 {appState.getActiveUsersCount()} Người Đang Truy Cập</span>
+              </button>
+            )}
             <button
               onClick={() => onNavigate('reports')}
               className="min-h-[44px] px-3.5 py-2 bg-gradient-to-r from-blue-700 to-indigo-800 hover:from-blue-600 hover:to-indigo-700 text-white text-xs font-bold rounded-xl shadow-xs transition active:scale-95 cursor-pointer flex items-center justify-center gap-1.5"

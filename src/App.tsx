@@ -10,6 +10,8 @@ import { QuickAttendanceModal } from './components/QuickAttendanceModal';
 import { QuickIncidentModal } from './components/QuickIncidentModal';
 import { ExcelImportModal } from './components/ExcelImportModal';
 import { AuthModal } from './components/AuthModal';
+import { ActiveUsersModal } from './components/ActiveUsersModal';
+import { SecurityCenterModal } from './components/SecurityCenterModal';
 import { ToastContainer } from './components/ToastContainer';
 
 // Pages
@@ -39,6 +41,8 @@ export function App() {
   const [showQuickIncident, setShowQuickIncident] = useState(false);
   const [showExcelImport, setShowExcelImport] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showActiveUsers, setShowActiveUsers] = useState(false);
+  const [showSecurityCenter, setShowSecurityCenter] = useState(false);
   const [pendingTabAfterAuth, setPendingTabAfterAuth] = useState<NavTab | null>(null);
   const [authPromptMessage, setAuthPromptMessage] = useState<string | null>(null);
 
@@ -60,6 +64,25 @@ export function App() {
     settings: { label: 'Cài đặt & Cơ sở dữ liệu', minRole: 'gvcn' },
   };
 
+  const TAB_NAMES: Record<string, string> = {
+    dashboard: 'Trang Tổng Quan',
+    class_info: 'Quản Lý Lớp & Ban Cán Sự',
+    students: 'Danh Sách Học Sinh Lớp 10A16',
+    groups: 'Danh Sách Tổ Học Tập',
+    seating: 'Sơ Đồ Lớp Học',
+    attendance: 'Trang Điểm Danh',
+    incidents: 'Nhật Ký Vi Phạm Nề Nếp',
+    rewards: 'Khen Thưởng & Thành Tích',
+    tasks: 'Lịch Trực Nhật & Nhiệm Vụ',
+    scoring: 'Bảng Điểm Rèn Luyện',
+    pending_rules: 'Quy Tắc Chờ xem xét',
+    period_locks: 'Khóa / Mở Kỳ Đánh Giá',
+    qualitative: 'Đánh Giá Định Tính',
+    reports: 'Xuất Báo Cáo Zalo / Excel',
+    audit: 'Nhật Ký Kiểm Toán',
+    settings: 'Cài Đặt Hệ Thống',
+  };
+
   const handleSelectTab = (tab: NavTab) => {
     const isOfficer = appState.currentUser.isAuthenticatedOfficer;
     const isGvcn = appState.currentUser.role === 'gvcn';
@@ -67,6 +90,7 @@ export function App() {
     // GVCN toàn quyền truy cập toàn bộ các tab không có hạn chế, không có vùng cấm
     if (isGvcn) {
       setActiveTab(tab);
+      appState.setActivePageName(TAB_NAMES[tab] || 'Trang Chủ');
       return;
     }
 
@@ -89,6 +113,7 @@ export function App() {
     }
 
     setActiveTab(tab);
+    appState.setActivePageName(TAB_NAMES[tab] || 'Trang Chủ');
   };
 
   const handleOpenAttendance = () => {
@@ -128,6 +153,8 @@ export function App() {
         onOpenQuickAttendance={handleOpenAttendance}
         onOpenQuickIncident={handleOpenIncident}
         onOpenExcelImport={handleOpenExcelImport}
+        onOpenActiveUsers={() => setShowActiveUsers(true)}
+        onOpenSecurityCenter={() => setShowSecurityCenter(true)}
         onOpenAuthModal={() => {
           setAuthPromptMessage(null);
           setShowAuthModal(true);
@@ -176,6 +203,7 @@ export function App() {
               onOpenQuickAttendance={handleOpenAttendance}
               onOpenQuickIncident={handleOpenIncident}
               onOpenExcelImport={handleOpenExcelImport}
+              onOpenActiveUsers={() => setShowActiveUsers(true)}
               onOpenAuthModal={() => {
                 setAuthPromptMessage(null);
                 setShowAuthModal(true);
@@ -252,6 +280,16 @@ export function App() {
           setShowAuthModal(false);
           setAuthPromptMessage(null);
         }}
+      />
+
+      <ActiveUsersModal
+        isOpen={showActiveUsers}
+        onClose={() => setShowActiveUsers(false)}
+      />
+
+      <SecurityCenterModal
+        isOpen={showSecurityCenter}
+        onClose={() => setShowSecurityCenter(false)}
       />
 
       {/* Global In-App Toast Notifications */}

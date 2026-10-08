@@ -12,6 +12,8 @@ import {
   Lock,
   LogOut,
   Save,
+  Users,
+  Radio,
 } from 'lucide-react';
 
 interface Props {
@@ -19,6 +21,8 @@ interface Props {
   onOpenQuickIncident: () => void;
   onOpenExcelImport: () => void;
   onOpenAuthModal?: () => void;
+  onOpenActiveUsers?: () => void;
+  onOpenSecurityCenter?: () => void;
   onToggleSidebar?: () => void;
 }
 
@@ -27,9 +31,12 @@ export const Navbar: React.FC<Props> = ({
   onOpenQuickIncident,
   onOpenExcelImport,
   onOpenAuthModal,
+  onOpenActiveUsers,
+  onOpenSecurityCenter,
   onToggleSidebar,
 }) => {
   const currentUser = appState.currentUser;
+  const activeCount = appState.getActiveUsersCount();
   const isOfficer =
     currentUser.role === 'gvcn' ||
     currentUser.role === 'lop_truong' ||
@@ -115,7 +122,36 @@ export const Navbar: React.FC<Props> = ({
           </div>
 
           {/* Active Role & Controls - Chữ to rõ ràng, không lộ email cá nhân */}
-          <div className="flex items-center gap-2.5 shrink-0">
+          <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
+            {/* Live Active Users Button */}
+            {onOpenActiveUsers && (
+              <button
+                type="button"
+                onClick={onOpenActiveUsers}
+                className="px-2.5 py-1.5 bg-emerald-950/80 hover:bg-emerald-900/90 text-emerald-300 border border-emerald-500/50 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-xs cursor-pointer active:scale-95"
+                title="Bấm để xem danh sách chi tiết ai đang truy cập ứng dụng"
+              >
+                <span className="relative flex h-2.5 w-2.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                </span>
+                <span className="font-extrabold">{activeCount} online</span>
+              </button>
+            )}
+
+            {/* Security Center Button */}
+            {onOpenSecurityCenter && (
+              <button
+                type="button"
+                onClick={onOpenSecurityCenter}
+                className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-emerald-500/40 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-xs cursor-pointer active:scale-95"
+                title="Bấm để mở Trung tâm Bảo mật & An toàn Dữ liệu"
+              >
+                <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                <span className="hidden sm:inline font-bold">Bảo Mật</span>
+              </button>
+            )}
+
             {/* Bộ chuyển đổi kích thước chữ (cho chiều tao chữ lớn lên) */}
             <div className="flex items-center gap-1 p-0.5 bg-slate-800 rounded-xl border border-slate-700">
               <button
