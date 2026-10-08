@@ -687,15 +687,25 @@ class AppStateService {
     }
   }
 
-  // Cập nhật Tổ trưởng tổ tự quản
+  // Cập nhật Tổ trưởng tổ tự quản (Toàn quyền điều chỉnh, không khoá cứng)
   public async updateGroupLeader(groupId: string, leaderStudentId: string) {
     const group = this.groups.find((g) => g.id === groupId);
     if (!group) return;
-    group.leader_student_id = leaderStudentId;
+    
+    // Unset previous leader or update
+    group.leader_student_id = leaderStudentId || undefined;
+
+    if (leaderStudentId) {
+      const stu = this.students.find((s) => s.id === leaderStudentId);
+      if (stu) {
+        stu.group_id = groupId;
+      }
+    }
 
     if (typeof window !== 'undefined') {
       try {
         localStorage.setItem('VTT_GROUPS', JSON.stringify(this.groups));
+        localStorage.setItem('VTT_STUDENTS', JSON.stringify(this.students));
       } catch (e) {}
     }
 
@@ -704,7 +714,7 @@ class AppStateService {
       `Chỉ định Tổ trưởng Tổ ${group.group_number}`,
       'groups',
       groupId,
-      `Mã HS: ${leaderStudentId}`
+      `Mã HS: ${leaderStudentId || 'Bỏ chỉ định'}`
     );
     this.notify();
 
@@ -717,6 +727,10 @@ class AppStateService {
           group_name: group.group_name,
           leader_student_id: leaderStudentId || null,
         }, { onConflict: 'id' });
+
+        if (leaderStudentId) {
+          await supabase.from('students').update({ group_id: groupId }).eq('id', leaderStudentId);
+        }
 
         await supabase.from('audit_logs').insert([{
           actor_name: this.currentUser.name || this.classInfo.gvcn_name || 'GVCN',

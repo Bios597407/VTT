@@ -64,6 +64,15 @@ export const SeatingPage: React.FC = () => {
   const [selectedStudentForSeat, setSelectedStudentForSeat] = useState<string>('');
   const [targetSwapSeatId, setTargetSwapSeatId] = useState<string>('');
 
+  // Group Leaders Quick Assignment Modal state
+  const [showLeadersModal, setShowLeadersModal] = useState(false);
+  const [leadersForm, setLeadersForm] = useState({
+    group1: groups.find((g) => g.group_number === 1)?.leader_student_id || '',
+    group2: groups.find((g) => g.group_number === 2)?.leader_student_id || '',
+    group3: groups.find((g) => g.group_number === 3)?.leader_student_id || '',
+    group4: groups.find((g) => g.group_number === 4)?.leader_student_id || '',
+  });
+
   // Quick inline typing query per seat ID
   const [inlineInputs, setInlineInputs] = useState<Record<string, string>>({});
   const [activeInlineSeatId, setActiveInlineSeatId] = useState<string | null>(null);
@@ -235,6 +244,34 @@ export const SeatingPage: React.FC = () => {
     }
   };
 
+  const handleOpenLeadersModal = () => {
+    setLeadersForm({
+      group1: groups.find((g) => g.group_number === 1)?.leader_student_id || '',
+      group2: groups.find((g) => g.group_number === 2)?.leader_student_id || '',
+      group3: groups.find((g) => g.group_number === 3)?.leader_student_id || '',
+      group4: groups.find((g) => g.group_number === 4)?.leader_student_id || '',
+    });
+    setShowLeadersModal(true);
+  };
+
+  const handleSaveGroupLeaders = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const g1 = groups.find((g) => g.group_number === 1);
+    if (g1) await appState.updateGroupLeader(g1.id, leadersForm.group1);
+
+    const g2 = groups.find((g) => g.group_number === 2);
+    if (g2) await appState.updateGroupLeader(g2.id, leadersForm.group2);
+
+    const g3 = groups.find((g) => g.group_number === 3);
+    if (g3) await appState.updateGroupLeader(g3.id, leadersForm.group3);
+
+    const g4 = groups.find((g) => g.group_number === 4);
+    if (g4) await appState.updateGroupLeader(g4.id, leadersForm.group4);
+
+    appState.showToast('👑 Đã cập nhật và đồng bộ phân công Tổ trưởng 4 Tổ thành công!', 'success');
+    setShowLeadersModal(false);
+  };
+
   // Filter matching students for quick search
   const getMatchingStudents = (query: string) => {
     const q = query.trim().toLowerCase();
@@ -357,6 +394,15 @@ export const SeatingPage: React.FC = () => {
               >
                 <Zap className="w-4 h-4 text-amber-900 fill-amber-300" />
                 <span>{isQuickTypeMode ? 'Đang bật Gõ Tên Nhanh' : 'Gõ Tên Trực Tiếp'}</span>
+              </button>
+
+              <button
+                onClick={handleOpenLeadersModal}
+                className="px-3 py-1.5 text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl shadow-2xs transition active:scale-95 cursor-pointer flex items-center gap-1.5 font-black"
+                title="Đổi/Bố trí lại Tổ trưởng cho Tổ 1, Tổ 2, Tổ 3, Tổ 4"
+              >
+                <Crown className="w-3.5 h-3.5 text-slate-950 fill-amber-300" />
+                <span>Bố trí Tổ trưởng</span>
               </button>
 
               <button
@@ -702,7 +748,123 @@ export const SeatingPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Seat Inspector / Edit Modal */}
+      {/* Group Leaders Quick Assignment Modal */}
+      {showLeadersModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 no-print">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden border border-slate-200">
+            <div className="px-5 py-4 bg-slate-900 text-white flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-base flex items-center gap-2">
+                  <Crown className="w-5 h-5 text-amber-400 fill-amber-300" />
+                  <span>Bố trí & Chỉ định Tổ trưởng (4 Tổ Lớp 10A16)</span>
+                </h3>
+                <p className="text-xs text-slate-300 mt-0.5">
+                  Toàn quyền điều chỉnh linh hoạt không khoá cứng • Đồng bộ vĩnh viễn
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowLeadersModal(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-white cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveGroupLeaders} className="p-5 space-y-4 text-xs">
+              {/* Group 1 */}
+              <div className="p-3 rounded-xl bg-blue-50/70 border border-blue-200 space-y-1">
+                <label className="block font-bold text-blue-900">Tổ trưởng Tổ 1 (Màu Xanh Dương):</label>
+                <select
+                  value={leadersForm.group1}
+                  onChange={(e) => setLeadersForm({ ...leadersForm, group1: e.target.value })}
+                  className="w-full p-2 border rounded-xl border-blue-300 bg-white font-medium"
+                >
+                  <option value="">-- Chưa chỉ định --</option>
+                  {students.map((stu) => (
+                    <option key={stu.id} value={stu.id}>
+                      {stu.student_code} - {stu.full_name} (Tổ {groups.find((g) => g.id === stu.group_id)?.group_number || '?'})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Group 2 */}
+              <div className="p-3 rounded-xl bg-emerald-50/70 border border-emerald-200 space-y-1">
+                <label className="block font-bold text-emerald-900">Tổ trưởng Tổ 2 (Màu Xanh Lá):</label>
+                <select
+                  value={leadersForm.group2}
+                  onChange={(e) => setLeadersForm({ ...leadersForm, group2: e.target.value })}
+                  className="w-full p-2 border rounded-xl border-emerald-300 bg-white font-medium"
+                >
+                  <option value="">-- Chưa chỉ định --</option>
+                  {students.map((stu) => (
+                    <option key={stu.id} value={stu.id}>
+                      {stu.student_code} - {stu.full_name} (Tổ {groups.find((g) => g.id === stu.group_id)?.group_number || '?'})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Group 3 */}
+              <div className="p-3 rounded-xl bg-amber-50/70 border border-amber-200 space-y-1">
+                <label className="block font-bold text-amber-900">Tổ trưởng Tổ 3 (Màu Hổ Phách):</label>
+                <select
+                  value={leadersForm.group3}
+                  onChange={(e) => setLeadersForm({ ...leadersForm, group3: e.target.value })}
+                  className="w-full p-2 border rounded-xl border-amber-300 bg-white font-medium"
+                >
+                  <option value="">-- Chưa chỉ định --</option>
+                  {students.map((stu) => (
+                    <option key={stu.id} value={stu.id}>
+                      {stu.student_code} - {stu.full_name} (Tổ {groups.find((g) => g.id === stu.group_id)?.group_number || '?'})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Group 4 */}
+              <div className="p-3 rounded-xl bg-purple-50/70 border border-purple-200 space-y-1">
+                <label className="block font-bold text-purple-900">Tổ trưởng Tổ 4 (Màu Tím):</label>
+                <select
+                  value={leadersForm.group4}
+                  onChange={(e) => setLeadersForm({ ...leadersForm, group4: e.target.value })}
+                  className="w-full p-2 border rounded-xl border-purple-300 bg-white font-medium"
+                >
+                  <option value="">-- Chưa chỉ định --</option>
+                  {students.map((stu) => (
+                    <option key={stu.id} value={stu.id}>
+                      {stu.student_code} - {stu.full_name} (Tổ {groups.find((g) => g.id === stu.group_id)?.group_number || '?'})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="pt-3 flex items-center justify-between border-t border-slate-100">
+                <span className="text-[11px] text-slate-500 italic">
+                  * Tự động điều chỉnh tổ cho học sinh được chọn làm Tổ trưởng
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowLeadersModal(false)}
+                    className="px-3.5 py-2 text-slate-600 hover:bg-slate-100 rounded-xl cursor-pointer"
+                  >
+                    Hủy
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-xl shadow-2xs transition active:scale-95 cursor-pointer flex items-center gap-1.5"
+                  >
+                    <Check className="w-4 h-4 text-slate-950" />
+                    <span>Lưu Phân Công Tổ Trưởng</span>
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
       {selectedSeat && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 no-print">
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden border border-slate-200">

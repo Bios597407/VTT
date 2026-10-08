@@ -44,16 +44,17 @@ export const GroupsPage: React.FC = () => {
     setShowEditGroupModal(true);
   };
 
-  const handleSaveEditGroup = (e: React.FormEvent) => {
+  const handleSaveEditGroup = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedGroup || !editGroupName.trim()) return;
 
     appState.updateGroup(selectedGroup.id, {
       group_name: editGroupName.trim(),
-      leader_student_id: editLeaderId || undefined,
     });
 
-    appState.showToast(`Đã cập nhật thông tin ${selectedGroup.group_name}!`, 'success');
+    await appState.updateGroupLeader(selectedGroup.id, editLeaderId);
+
+    appState.showToast(`Đã cập nhật thông tin ${selectedGroup.group_name} & Tổ trưởng!`, 'success');
     setShowEditGroupModal(false);
   };
 
@@ -333,18 +334,27 @@ export const GroupsPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="block font-semibold text-slate-700 mb-1">Chỉ định Tổ trưởng</label>
+                <label className="block font-semibold text-slate-700 mb-1">Chỉ định Tổ trưởng (Không khoá cứng, GVCN chọn tự do)</label>
                 <select
                   value={editLeaderId}
                   onChange={(e) => setEditLeaderId(e.target.value)}
-                  className="w-full p-2.5 border rounded-xl border-slate-300 text-xs"
+                  className="w-full p-2.5 border rounded-xl border-slate-300 text-xs font-medium"
                 >
                   <option value="">-- Chưa chỉ định tổ trưởng --</option>
-                  {groupMembers.map((stu) => (
-                    <option key={stu.id} value={stu.id}>
-                      {stu.student_code} - {stu.full_name}
-                    </option>
-                  ))}
+                  <optgroup label={`Thành viên hiện tại (${selectedGroup.group_name})`}>
+                    {groupMembers.map((stu) => (
+                      <option key={stu.id} value={stu.id}>
+                        {stu.student_code} - {stu.full_name}
+                      </option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="Học sinh khác trong Lớp 10A16">
+                    {students.filter((s) => s.group_id !== selectedGroup.id).map((stu) => (
+                      <option key={stu.id} value={stu.id}>
+                        {stu.student_code} - {stu.full_name} (Hiện ở Tổ {groups.find((g) => g.id === stu.group_id)?.group_number || '?'})
+                      </option>
+                    ))}
+                  </optgroup>
                 </select>
               </div>
 

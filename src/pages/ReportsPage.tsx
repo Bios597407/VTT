@@ -113,7 +113,23 @@ export const ReportsPage: React.FC = () => {
 
       {/* Printable Report View */}
       {printPreview && (
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-lg p-8 space-y-6 max-w-4xl mx-auto print:m-0 print:border-none print:shadow-none">
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-lg p-8 space-y-6 max-w-4xl mx-auto print:m-0 print:border-none print:shadow-none print:max-w-none print:w-full">
+          <div className="flex justify-between items-center border-b pb-4 border-slate-200 print:hidden">
+            <div>
+              <h3 className="font-bold text-sm text-slate-900">Mẫu in Biên bản Sinh hoạt Lớp — Sĩ số 43/43 Học sinh</h3>
+              <p className="text-xs text-slate-500">Xem trước toàn bộ 43 học sinh và chuẩn bị xuất in chính thức</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => window.print()}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-700 hover:bg-blue-800 text-white text-xs font-bold rounded-lg shadow-sm transition active:scale-95 cursor-pointer"
+              >
+                <Printer className="w-4 h-4" />
+                In Biên Bản / Tải PDF
+              </button>
+            </div>
+          </div>
+
           <div className="text-center space-y-1 border-b pb-4 border-slate-300">
             <div className="text-xs font-semibold uppercase text-slate-700">
               SỞ GIÁO DỤC VÀ ĐÀO TẠO THÀNH PHỐ HỒ CHÍ MINH
@@ -125,7 +141,7 @@ export const ReportsPage: React.FC = () => {
               BIÊN BẢN ĐÁNH GIÁ KẾT QUẢ RÈN LUYỆN VÀ NỀ NẾP TUẦN
             </h2>
             <div className="text-xs text-slate-600 italic">
-              Năm học {appState.classInfo.academic_year} • Giáo viên chủ nhiệm: {appState.classInfo.gvcn_name}
+              Năm học {appState.classInfo.academic_year} • Sĩ số: 43 học sinh • Giáo viên chủ nhiệm: {appState.classInfo.gvcn_name}
             </div>
           </div>
 
@@ -133,7 +149,7 @@ export const ReportsPage: React.FC = () => {
             <table className="w-full text-left border-collapse border border-slate-300">
               <thead>
                 <tr className="bg-slate-100 text-slate-800 font-bold border-b border-slate-300">
-                  <th className="p-2 border border-slate-300">STT</th>
+                  <th className="p-2 border border-slate-300 text-center">STT</th>
                   <th className="p-2 border border-slate-300">Mã số</th>
                   <th className="p-2 border border-slate-300">Họ và tên</th>
                   <th className="p-2 border border-slate-300 text-center">Gốc</th>
@@ -144,21 +160,28 @@ export const ReportsPage: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {students.slice(0, 15).map((stu, idx) => {
+                {students.map((stu, idx) => {
                   const snap = weeklySnapshots.find((s) => s.student_id === stu.id && s.is_current);
+                  const hasIncident = incidents.some((inc) => inc.student_id === stu.id);
+                  const noteText = hasIncident ? 'Có ghi nhận nề nếp' : 'Nề nếp ổn định';
+
                   return (
-                    <tr key={stu.id} className="border-b border-slate-200">
-                      <td className="p-2 border border-slate-300 text-center">{idx + 1}</td>
-                      <td className="p-2 border border-slate-300 font-mono">{stu.student_code}</td>
-                      <td className="p-2 border border-slate-300 font-semibold">{stu.full_name}</td>
-                      <td className="p-2 border border-slate-300 text-center">8.0</td>
-                      <td className="p-2 border border-slate-300 text-center">+{snap?.reward_points ?? 0}</td>
-                      <td className="p-2 border border-slate-300 text-center">{snap?.deduction_points ?? 0}</td>
-                      <td className="p-2 border border-slate-300 text-center font-bold text-blue-800">
+                    <tr key={stu.id} className="border-b border-slate-200 hover:bg-slate-50">
+                      <td className="p-1.5 border border-slate-300 text-center font-mono text-slate-600">{idx + 1}</td>
+                      <td className="p-1.5 border border-slate-300 font-mono text-slate-700">{stu.student_code}</td>
+                      <td className="p-1.5 border border-slate-300 font-semibold text-slate-900">{stu.full_name}</td>
+                      <td className="p-1.5 border border-slate-300 text-center">8.0</td>
+                      <td className="p-1.5 border border-slate-300 text-center text-emerald-700 font-medium">
+                        +{snap?.reward_points ?? 0}
+                      </td>
+                      <td className="p-1.5 border border-slate-300 text-center text-rose-700 font-medium">
+                        -{snap?.deduction_points ?? 0}
+                      </td>
+                      <td className="p-1.5 border border-slate-300 text-center font-bold text-blue-800">
                         {snap?.official_week_score ?? '8.0'}
                       </td>
-                      <td className="p-2 border border-slate-300 text-slate-500 text-[11px]">
-                        Nề nếp ổn định
+                      <td className="p-1.5 border border-slate-300 text-slate-600 text-[11px]">
+                        {noteText}
                       </td>
                     </tr>
                   );
@@ -167,12 +190,12 @@ export const ReportsPage: React.FC = () => {
             </table>
           </div>
 
-          <div className="flex justify-between items-end pt-8 text-xs font-semibold text-slate-800">
+          <div className="flex justify-between items-end pt-8 text-xs font-semibold text-slate-800 print:break-inside-avoid">
             <div className="text-center">
               <div>ĐẠI DIỆN BAN CÁN SỰ LỚP</div>
               <div className="text-[11px] text-slate-500 mt-0.5">(Ký và ghi rõ họ tên)</div>
               <div className="h-16"></div>
-              <div>{appState.classInfo.class_president_name || 'Lớp trưởng'}</div>
+              <div>{appState.classInfo.class_president_name || 'Trần Đức Anh'}</div>
             </div>
 
             <div className="text-center">
