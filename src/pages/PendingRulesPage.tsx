@@ -339,22 +339,45 @@ export const PendingRulesPage: React.FC = () => {
 
                   {/* Options */}
                   <div className="space-y-1.5 text-xs">
-                    <div className="font-semibold text-slate-700 text-[11px]">Các phương án giải quyết:</div>
+                    <div className="font-semibold text-slate-700 text-[11px] flex items-center justify-between">
+                      <span>Các phương án giải quyết (Nhấn trực tiếp vào phương án để chọn &amp; lưu):</span>
+                      {rule.selected_option && (
+                        <span className="text-emerald-700 font-bold text-[10px] bg-emerald-100 px-2.5 py-0.5 rounded-full border border-emerald-300 flex items-center gap-1">
+                          <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                          Đã chọn &amp; lưu vĩnh viễn
+                        </span>
+                      )}
+                    </div>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                       {rule.options.map((opt) => {
                         const isSelected = rule.selected_option === opt.id;
                         return (
-                          <div
+                          <button
+                            type="button"
                             key={opt.id}
-                            className={`p-2.5 rounded-lg border text-[11px] space-y-1 ${
+                            onClick={() => {
+                              if (canManageRules) {
+                                appState.selectRuleOption(rule.code, opt.id);
+                                appState.showToast(`🎉 Đã lưu vĩnh viễn lựa chọn cho quy tắc ${rule.code}!`, 'success');
+                              }
+                            }}
+                            className={`p-3 rounded-xl border text-[11px] space-y-1 text-left transition cursor-pointer active:scale-98 ${
                               isSelected
-                                ? 'bg-emerald-50 border-emerald-500 text-emerald-950 font-bold ring-1 ring-emerald-500'
-                                : 'bg-white border-slate-200 text-slate-600'
+                                ? 'bg-emerald-50 border-emerald-500 text-emerald-950 font-bold ring-2 ring-emerald-500/80 shadow-xs'
+                                : 'bg-white border-slate-200 text-slate-600 hover:border-purple-400 hover:bg-slate-50/80'
                             }`}
+                            title={canManageRules ? 'Nhấn để chọn và phê duyệt quy tắc này ngay lập tức' : 'Chế độ chỉ xem'}
                           >
-                            <div className="font-semibold">{opt.label}</div>
-                            <div className="text-[10px] text-slate-400 font-normal">{opt.description}</div>
-                          </div>
+                            <div className="flex items-start justify-between gap-1.5">
+                              <span className="font-bold text-slate-900">{opt.label}</span>
+                              {isSelected && (
+                                <span className="bg-emerald-600 text-white p-0.5 rounded-full shrink-0">
+                                  <CheckCircle2 className="w-3.5 h-3.5" />
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-[10px] text-slate-500 font-normal leading-snug">{opt.description}</div>
+                          </button>
                         );
                       })}
                     </div>

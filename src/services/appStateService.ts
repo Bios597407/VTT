@@ -303,6 +303,7 @@ class AppStateService {
           const parsed = JSON.parse(savedSeats);
           if (Array.isArray(parsed) && parsed.length > 0) this.seats = parsed;
         }
+        this.ensureCapacitySeats();
 
         const savedTasks = localStorage.getItem('VTT_TASKS');
         if (savedTasks) {
@@ -319,8 +320,25 @@ class AppStateService {
         const savedPendingRules = localStorage.getItem('VTT_PENDING_RULES');
         if (savedPendingRules) {
           const parsed = JSON.parse(savedPendingRules);
-          if (Array.isArray(parsed)) this.pendingRules = parsed;
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            this.pendingRules = OFFICIAL_PENDING_RULES.map((defaultRule) => {
+              const found = parsed.find((p: any) => p.code === defaultRule.code);
+              const selectedOption = found?.selected_option || defaultRule.selected_option;
+              return {
+                ...defaultRule,
+                ...found,
+                selected_option: selectedOption,
+                status: 'confirmed_by_gvcn',
+                basis: found?.basis || defaultRule.basis,
+                effective_from: found?.effective_from || defaultRule.effective_from,
+                effective_to: found?.effective_to || defaultRule.effective_to,
+                configured_by: found?.configured_by || defaultRule.configured_by,
+                confirmed_by: found?.confirmed_by || defaultRule.confirmed_by,
+              };
+            });
+          }
         }
+        localStorage.setItem('VTT_PENDING_RULES', JSON.stringify(this.pendingRules));
 
         const savedConductCatalog = localStorage.getItem('VTT_CONDUCT_CATALOG');
         if (savedConductCatalog) {
@@ -1019,8 +1037,9 @@ class AppStateService {
     const classId = 'class-10a16';
     let stuIdx = 0;
     for (let r = 1; r <= 6; r++) {
-      for (let c = 1; c <= 4; c++) {
-        const tableNum = (r - 1) * 2 + (c <= 2 ? 1 : 2);
+      for (let c = 1; c <= 8; c++) {
+        const colGroup = Math.ceil(c / 2);
+        const tableNum = (r - 1) * 4 + colGroup;
         const stu = this.students[stuIdx];
         seats.push({
           id: `seat-${r}-${c}`,
@@ -1031,6 +1050,34 @@ class AppStateService {
           student_id: stu ? stu.id : undefined,
         });
         stuIdx++;
+      }
+    }
+    this.seats = seats;
+  }
+
+  public ensureCapacitySeats() {
+    const classId = 'class-10a16';
+    const existingMap = new Map(this.seats.map((s) => [s.id, s]));
+    const seats: Seat[] = [];
+    for (let r = 1; r <= 6; r++) {
+      for (let c = 1; c <= 8; c++) {
+        const id = `seat-${r}-${c}`;
+        const colGroup = Math.ceil(c / 2);
+        const tableNum = (r - 1) * 4 + colGroup;
+        if (existingMap.has(id)) {
+          seats.push(existingMap.get(id)!);
+        } else {
+          const assignedIds = new Set(Array.from(existingMap.values()).map((s) => s.student_id).filter(Boolean));
+          const unassignedStu = this.students.find((s) => !assignedIds.has(s.id));
+          seats.push({
+            id,
+            class_id: classId,
+            row_number: r,
+            col_number: c,
+            table_number: tableNum,
+            student_id: unassignedStu ? unassignedStu.id : undefined,
+          });
+        }
       }
     }
     this.seats = seats;
@@ -1185,7 +1232,7 @@ class AppStateService {
       });
       const stu = this.students.find((s) => s.id === studentId);
       if (stu) {
-        stu.seat_number = `Bàn ${seat.table_number} (Dãy ${seat.col_number <= 2 ? 1 : 2})`;
+        stu.seat_number = `Bàn ${seat.table_number} (Dãy ${Math.ceil(seat.col_number / 2)})`;
       }
     } else {
       if (seat.student_id) {
@@ -1214,11 +1261,11 @@ class AppStateService {
 
     if (s1.student_id) {
       const stu1 = this.students.find((s) => s.id === s1.student_id);
-      if (stu1) stu1.seat_number = `Bàn ${s1.table_number} (Dãy ${s1.col_number <= 2 ? 1 : 2})`;
+      if (stu1) stu1.seat_number = `Bàn ${s1.table_number} (Dãy ${Math.ceil(s1.col_number / 2)})`;
     }
     if (s2.student_id) {
       const stu2 = this.students.find((s) => s.id === s2.student_id);
-      if (stu2) stu2.seat_number = `Bàn ${s2.table_number} (Dãy ${s2.col_number <= 2 ? 1 : 2})`;
+      if (stu2) stu2.seat_number = `Bàn ${s2.table_number} (Dãy ${Math.ceil(s2.col_number / 2)})`;
     }
 
     this.addAuditLog(this.currentUser.name, 'Hoán đổi chỗ ngồi giữa 2 bàn', 'seat', `${seatId1}<->${seatId2}`);
@@ -1553,6 +1600,32 @@ class AppStateService {
   }
 
   // --- Pending Rules Configuration (GVCN, Lớp phó, Lớp trưởng có toàn quyền) ---
+  public selectRuleOption(ruleCode: string, optionId: string) {
+    const rule = this.pendingRules.find((r) => r.code === ruleCode);
+    if (!rule) return;
+
+    rule.selected_option = optionId;
+    rule.status = 'confirmed_by_gvcn';
+    rule.configured_by = this.currentUser.name;
+    rule.confirmed_by = this.currentUser.name;
+    if (!rule.basis) {
+      rule.basis = 'Phê duyệt trực tiếp theo phương án đã chọn (GVCN & Ban Cán Sự Lớp 10A16)';
+    }
+    if (!rule.effective_from) {
+      rule.effective_from = new Date().toISOString().split('T')[0];
+    }
+
+    this.addAuditLog(
+      this.currentUser.name,
+      'Chọn & phê duyệt phương án quy tắc nề nếp',
+      'pending_rule',
+      ruleCode,
+      `Đã chọn phương án: ${optionId}`
+    );
+
+    this.notify();
+  }
+
   public configurePendingRule(
     ruleCode: string,
     selectedOption: string,
