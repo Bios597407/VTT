@@ -73,13 +73,7 @@ export const ClassManagementPage: React.FC<Props> = ({ onNavigate, onOpenAuthMod
     group4_leader: groups.find((g) => g.group_number === 4)?.leader_student_id || '',
   });
 
-  // State: Modal 3 - Quản lý Mã PIN cán bộ bảo mật
-  const [isEditingPins, setIsEditingPins] = useState(false);
-  const [pinForm, setPinForm] = useState({
-    gvcnPin: officerAccounts.find((a) => a.role === 'gvcn')?.pin || '1016',
-    ltPin: officerAccounts.find((a) => a.role === 'lop_truong')?.pin || '10A16lpht',
-    lpPin: officerAccounts.find((a) => a.role === 'lop_pho')?.pin || '10A16bt',
-  });
+  // States related to officer management are now hosted solely in SettingsPage
 
   const handleQuickGvcnLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -119,6 +113,8 @@ export const ClassManagementPage: React.FC<Props> = ({ onNavigate, onOpenAuthMod
     setIsEditingOfficers(true);
   };
 
+  // Handlers related to officer management are now hosted solely in SettingsPage
+
   const handleSaveOfficers = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -148,13 +144,7 @@ export const ClassManagementPage: React.FC<Props> = ({ onNavigate, onOpenAuthMod
     setIsEditingOfficers(false);
   };
 
-  const handleSavePins = (e: React.FormEvent) => {
-    e.preventDefault();
-    appState.updateOfficerPin('gvcn', pinForm.gvcnPin);
-    appState.updateOfficerPin('lop_truong', pinForm.ltPin);
-    appState.updateOfficerPin('lop_pho', pinForm.lpPin);
-    setIsEditingPins(false);
-  };
+  // handleSavePins has been replaced by Quản trị Nhân sự inline edits
 
   return (
     <div className="space-y-5">
@@ -371,48 +361,7 @@ export const ClassManagementPage: React.FC<Props> = ({ onNavigate, onOpenAuthMod
             </div>
           </div>
 
-          {/* Security & PIN Manager for GVCN */}
-          {canManageClass && (
-            <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                <div className="flex items-center gap-2">
-                  <KeyRound className="w-5 h-5 text-emerald-600" />
-                  <div>
-                    <h3 className="font-bold text-sm text-slate-900">
-                      Quản lý Mã PIN & Tài khoản Cán bộ (Bảo mật GVCN)
-                    </h3>
-                    <p className="text-[11px] text-slate-500">
-                      GVCN có toàn quyền thay đổi mã PIN đăng nhập của bản thân và các cán sự
-                    </p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setIsEditingPins(true)}
-                  className="px-3 py-1.5 text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl shadow-xs transition active:scale-95 cursor-pointer flex items-center gap-1"
-                >
-                  <Edit3 className="w-3.5 h-3.5" />
-                  <span>Đổi mã PIN</span>
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-                {officerAccounts.map((acc) => (
-                  <div key={acc.id} className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                        {acc.title}
-                      </span>
-                      <span className="text-[10px] font-mono font-bold bg-slate-200 px-1.5 py-0.5 rounded">
-                        PIN: {acc.pin}
-                      </span>
-                    </div>
-                    <div className="font-bold text-slate-900 truncate">{acc.name}</div>
-                    <div className="text-[10px] text-slate-500 font-mono truncate">{acc.email}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          {/* Officers & Accounts Management has been successfully moved back to SettingsPage.tsx under Cài đặt & Cơ sở dữ liệu */}
         </div>
 
         {/* Right Column: Class Officers Card (Ban Cán Sự) */}
@@ -963,77 +912,7 @@ export const ClassManagementPage: React.FC<Props> = ({ onNavigate, onOpenAuthMod
         </div>
       )}
 
-      {/* Modal 3: Quản lý Mã PIN Cán bộ Bảo Mật */}
-      {isEditingPins && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden border border-slate-200">
-            <div className="px-5 py-4 bg-slate-900 text-white flex items-center justify-between">
-              <div>
-                <h3 className="font-bold text-base">Cấu hình Mã PIN Bảo Mật Cán Sự</h3>
-                <p className="text-xs text-slate-300">Đổi mã PIN nhanh cho GVCN và Ban Cán sự</p>
-              </div>
-              <button
-                onClick={() => setIsEditingPins(false)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleSavePins} className="p-5 space-y-3.5 text-xs">
-              <div>
-                <label className="block font-bold text-slate-800 mb-1">Mã PIN Giáo viên Chủ nhiệm ({classInfo.gvcn_name})</label>
-                <input
-                  type="text"
-                  required
-                  value={pinForm.gvcnPin}
-                  onChange={(e) => setPinForm({ ...pinForm, gvcnPin: e.target.value })}
-                  className="w-full p-2.5 border rounded-xl border-slate-300 font-mono font-bold tracking-wider"
-                />
-              </div>
-
-              <div>
-                <label className="block font-bold text-slate-800 mb-1">Mã PIN Lớp phó Học tập ({classInfo.class_vice_academic_name})</label>
-                <input
-                  type="text"
-                  required
-                  value={pinForm.ltPin}
-                  onChange={(e) => setPinForm({ ...pinForm, ltPin: e.target.value })}
-                  className="w-full p-2.5 border rounded-xl border-slate-300 font-mono font-bold tracking-wider"
-                />
-              </div>
-
-              <div>
-                <label className="block font-bold text-slate-800 mb-1">Mã PIN Bí thư Chi đoàn ({classInfo.secretary_name})</label>
-                <input
-                  type="text"
-                  required
-                  value={pinForm.lpPin}
-                  onChange={(e) => setPinForm({ ...pinForm, lpPin: e.target.value })}
-                  className="w-full p-2.5 border rounded-xl border-slate-300 font-mono font-bold tracking-wider"
-                />
-              </div>
-
-              <div className="pt-3 flex items-center justify-end gap-2 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setIsEditingPins(false)}
-                  className="px-3.5 py-2 text-slate-600 hover:bg-slate-100 rounded-xl cursor-pointer"
-                >
-                  Hủy
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl shadow-xs transition active:scale-95 cursor-pointer flex items-center gap-1.5"
-                >
-                  <Check className="w-4 h-4" />
-                  <span>Lưu Mã PIN Mới</span>
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      {/* Modal 3 has been deprecated and merged into the main inline human resources section */}
     </div>
   );
 };

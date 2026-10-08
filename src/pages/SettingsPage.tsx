@@ -478,7 +478,7 @@ export const SettingsPage: React.FC = () => {
               </p>
             </div>
           </div>
-          <span className="text-xs px-3 py-1 bg-blue-50 text-blue-800 font-bold rounded-lg border border-blue-200 self-start sm:self-auto">
+          <span className="text-xs px-3 py-1 bg-blue-50 text-blue-800 font-bold rounded-lg border border-blue-200 self-start sm:self-auto shrink-0">
             {officerAccounts.length} Tài khoản Cán bộ
           </span>
         </div>
