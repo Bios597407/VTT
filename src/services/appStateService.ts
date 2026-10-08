@@ -451,6 +451,24 @@ class AppStateService {
     this.listeners.forEach((l) => l());
   }
 
+  // --- High-Security Access Control Guards ---
+  public isWriteAuthorized(): boolean {
+    return Boolean(
+      this.currentUser.isAuthenticatedOfficer &&
+      (this.currentUser.role === 'gvcn' ||
+       this.currentUser.role === 'lop_truong' ||
+       this.currentUser.role === 'lop_pho')
+    );
+  }
+
+  public checkWriteAuthorization(): boolean {
+    if (!this.isWriteAuthorized()) {
+      this.showToast('🔒 BẢO MẬT MỨC CAO NHẤT: Vai trò Học sinh CHỈ ĐƯỢC QUYỀN XEM. Vui lòng kích hoạt quyền GVCN / Cán sự để chỉnh sửa!', 'error');
+      return false;
+    }
+    return true;
+  }
+
   private saveLocalState() {
     if (typeof window === 'undefined') return;
     try {
@@ -657,6 +675,7 @@ class AppStateService {
 
   // --- Class Management & Settings (GVCN toàn quyền thay đổi không hạn chế) ---
   public async updateClassInfo(updates: Partial<ClassInfo>) {
+    if (!this.checkWriteAuthorization()) return;
     Object.assign(this.classInfo, updates);
 
     // Đồng bộ tức thời danh sách tài khoản cán sự
@@ -732,6 +751,7 @@ class AppStateService {
 
   // Cập nhật Tổ trưởng tổ tự quản (Toàn quyền điều chỉnh, không khoá cứng)
   public async updateGroupLeader(groupId: string, leaderStudentId: string) {
+    if (!this.checkWriteAuthorization()) return;
     const group = this.groups.find((g) => g.id === groupId);
     if (!group) return;
     
@@ -1164,6 +1184,7 @@ class AppStateService {
 
   // --- Student Management (GVCN & Ban Cán sự có toàn quyền điều chỉnh) ---
   public addStudent(studentData: Omit<Student, 'id'>): { success: boolean; id: string } {
+    if (!this.checkWriteAuthorization()) return { success: false, id: '' };
     const id = studentData.student_code ? `stu-10a16-${studentData.student_code.replace(/[^a-zA-Z0-9]/g, '')}` : `stu-${Date.now()}`;
     const newStudent: Student = {
       ...studentData,
@@ -1203,6 +1224,7 @@ class AppStateService {
   }
 
   public updateStudent(studentId: string, updates: Partial<Student>) {
+    if (!this.checkWriteAuthorization()) return;
     const stu = this.students.find((s) => s.id === studentId);
     if (!stu) return;
     Object.assign(stu, updates);
@@ -1231,6 +1253,7 @@ class AppStateService {
   }
 
   public deleteStudent(studentId: string) {
+    if (!this.checkWriteAuthorization()) return;
     const idx = this.students.findIndex((s) => s.id === studentId);
     if (idx === -1) return;
     const removed = this.students[idx];
@@ -1258,6 +1281,7 @@ class AppStateService {
 
   // --- Group Management (Tổ học tập) ---
   public updateGroup(groupId: string, updates: Partial<Group>) {
+    if (!this.checkWriteAuthorization()) return;
     const grp = this.groups.find((g) => g.id === groupId);
     if (!grp) return;
     Object.assign(grp, updates);
@@ -1272,6 +1296,7 @@ class AppStateService {
   }
 
   public assignStudentToGroup(studentId: string, groupId: string) {
+    if (!this.checkWriteAuthorization()) return;
     const stu = this.students.find((s) => s.id === studentId);
     if (!stu) return;
     stu.group_id = groupId;
@@ -1365,6 +1390,7 @@ class AppStateService {
   }
 
   public assignStudentToSeat(seatId: string, studentId?: string) {
+    if (!this.checkWriteAuthorization()) return;
     const seat = this.seats.find((s) => s.id === seatId);
     if (!seat) return;
     this.createSeatingBackupSnapshot();
@@ -1393,6 +1419,7 @@ class AppStateService {
   }
 
   public swapSeats(seatId1: string, seatId2: string) {
+    if (!this.checkWriteAuthorization()) return;
     const s1 = this.seats.find((s) => s.id === seatId1);
     const s2 = this.seats.find((s) => s.id === seatId2);
     if (!s1 || !s2) return;
@@ -1418,6 +1445,7 @@ class AppStateService {
   }
 
   public autoArrangeSeats(method: 'by_group' | 'by_roster' = 'by_roster') {
+    if (!this.checkWriteAuthorization()) return;
     this.createSeatingBackupSnapshot();
     if (method === 'by_group') {
       // Sắp xếp học sinh thuộc từng Tổ 1..4 vào các Cột bàn 1..4 tương ứng
@@ -1473,6 +1501,7 @@ class AppStateService {
 
   // --- Multi-Plan Seating Management ---
   public saveCurrentSeatsToPlan(planName?: string) {
+    if (!this.checkWriteAuthorization()) return;
     const activePlan = this.seatingPlans.find((p) => p.id === this.activeSeatingPlanId);
     if (activePlan) {
       if (planName && planName.trim()) activePlan.name = planName.trim();
@@ -1500,6 +1529,7 @@ class AppStateService {
   }
 
   public createNewSeatingPlan(name: string, cloneFromCurrent: boolean = true) {
+    if (!this.checkWriteAuthorization()) return;
     const newId = `plan-${Date.now()}`;
     const cleanName = name.trim() || `Sơ đồ Mới (${new Date().toLocaleDateString('vi-VN')})`;
     const newPlan: SeatingPlan = {
@@ -1525,6 +1555,7 @@ class AppStateService {
   }
 
   public deleteSeatingPlan(planId: string) {
+    if (!this.checkWriteAuthorization()) return;
     if (this.seatingPlans.length <= 1) {
       this.showToast('Cần giữ lại ít nhất 1 phương án sơ đồ chỗ ngồi!', 'warn');
       return;
@@ -1541,6 +1572,7 @@ class AppStateService {
 
   // --- Duty Roster & Rotating Schedule ---
   public updateDutyRosterDay(dayOfWeek: string, updates: Partial<DutyRosterDay>) {
+    if (!this.checkWriteAuthorization()) return;
     const dayIndex = this.dutyRoster.findIndex((d) => d.dayOfWeek === dayOfWeek);
     if (dayIndex !== -1) {
       const assignedGroup = this.groups.find((g) => g.id === updates.assignedGroupId);
@@ -1555,6 +1587,7 @@ class AppStateService {
   }
 
   public autoRotateDutyRoster() {
+    if (!this.checkWriteAuthorization()) return;
     if (this.groups.length === 0) return;
     this.dutyRoster.forEach((d, idx) => {
       const nextGroup = this.groups[idx % this.groups.length];
@@ -1659,6 +1692,7 @@ class AppStateService {
 
   // --- Attendance ---
   public recordAttendance(record: Omit<AttendanceRecord, 'id'>): { success: boolean; id: string } {
+    if (!this.checkWriteAuthorization()) return { success: false, id: '' };
     const existingIndex = this.attendance.findIndex(
       (a) => a.student_id === record.student_id && a.date === record.date && a.session === record.session
     );
@@ -1706,6 +1740,7 @@ class AppStateService {
   }
 
   public submitIncident(incidentData: Omit<Incident, 'id' | 'created_at' | 'effective_deduction'>): { success: boolean; id: string; warning?: string } {
+    if (!this.checkWriteAuthorization()) return { success: false, id: '' };
     const isDup = this.checkIncidentDuplicate(incidentData.student_id, incidentData.date, incidentData.session, incidentData.conduct_code);
 
     let baseDeduction = 0;
@@ -1772,6 +1807,7 @@ class AppStateService {
     scoreEffectStatus: 'confirmed_effect' | 'pending_rule' | 'waived' | 'none',
     comment?: string
   ) {
+    if (!this.checkWriteAuthorization()) return;
     const inc = this.incidents.find((i) => i.id === incidentId);
     if (!inc) return;
 
@@ -1809,6 +1845,7 @@ class AppStateService {
   }
 
   public updateIncident(incidentId: string, updates: Partial<Incident>) {
+    if (!this.checkWriteAuthorization()) return;
     const inc = this.incidents.find((i) => i.id === incidentId);
     if (!inc) return;
 
@@ -1850,6 +1887,7 @@ class AppStateService {
   }
 
   public deleteIncident(incidentId: string) {
+    if (!this.checkWriteAuthorization()) return;
     const incIdx = this.incidents.findIndex((i) => i.id === incidentId);
     if (incIdx === -1) return;
 
@@ -1876,6 +1914,7 @@ class AppStateService {
 
   // --- Rewards ---
   public submitReward(reward: Omit<RewardRecord, 'id' | 'created_at'>): { success: boolean; id: string; warning?: string } {
+    if (!this.checkWriteAuthorization()) return { success: false, id: '' };
     const isDup = this.rewards.some(
       (r) => r.student_id === reward.student_id && r.reward_code === reward.reward_code && r.date === reward.date
     );
@@ -1917,6 +1956,7 @@ class AppStateService {
   }
 
   public reviewReward(rewardId: string, approved: boolean) {
+    if (!this.checkWriteAuthorization()) return;
     const rew = this.rewards.find((r) => r.id === rewardId);
     if (!rew) return;
 
@@ -1938,6 +1978,7 @@ class AppStateService {
 
   // --- Positive Notes ---
   public addPositiveNote(note: Omit<PositiveNote, 'id' | 'created_at'>) {
+    if (!this.checkWriteAuthorization()) return;
     const id = `pos-${Date.now()}`;
     const newNote: PositiveNote = { ...note, id, created_at: new Date().toISOString() };
     this.positiveNotes.unshift(newNote);
@@ -1947,6 +1988,7 @@ class AppStateService {
 
   // --- Tasks ---
   public createTask(task: Omit<Task, 'id' | 'created_at'>) {
+    if (!this.checkWriteAuthorization()) return;
     const id = `task-${Date.now()}`;
     const newTask: Task = { ...task, id, created_at: new Date().toISOString() };
     this.tasks.unshift(newTask);
@@ -1955,6 +1997,7 @@ class AppStateService {
   }
 
   public updateTaskStatus(taskId: string, status: Task['status']) {
+    if (!this.checkWriteAuthorization()) return;
     const task = this.tasks.find((t) => t.id === taskId);
     if (!task) return;
     task.status = status;
@@ -1964,6 +2007,7 @@ class AppStateService {
 
   // --- Pending Rules Configuration (GVCN, Lớp phó, Lớp trưởng có toàn quyền) ---
   public selectRuleOption(ruleCode: string, optionId: string) {
+    if (!this.checkWriteAuthorization()) return;
     const rule = this.pendingRules.find((r) => r.code === ruleCode);
     if (!rule) return;
 

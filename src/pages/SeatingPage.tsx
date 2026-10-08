@@ -45,11 +45,12 @@ export const SeatingPage: React.FC = () => {
   const classInfo = appState.classInfo;
   const groups = appState.groups;
 
-  // Permission: GVCN, Lớp phó, Lớp trưởng có toàn quyền điều chỉnh sơ đồ chỗ ngồi
+  // High-Security Permission Check: GVCN, Lớp phó, Lớp trưởng đã đăng nhập có quyền điều chỉnh sơ đồ chỗ ngồi
   const canManageSeating =
-    currentUser.role === 'gvcn' ||
-    currentUser.role === 'lop_truong' ||
-    currentUser.role === 'lop_pho';
+    Boolean(currentUser.isAuthenticatedOfficer) &&
+    (currentUser.role === 'gvcn' ||
+      currentUser.role === 'lop_truong' ||
+      currentUser.role === 'lop_pho');
 
   // Display modes: 'standard' (Xem đầy đủ), 'compact' (Thu gọn), 'print' (Bản in)
   const [viewMode, setViewMode] = useState<'standard' | 'compact' | 'print'>('standard');
@@ -222,6 +223,10 @@ export const SeatingPage: React.FC = () => {
   };
 
   const handleAutoArrange = (method: 'by_group' | 'by_roster') => {
+    if (!canManageSeating) {
+      appState.showToast('🔒 CHẾ ĐỘ BẢO MẬT CAO: Vai trò Học Sinh chỉ được quyền xem. Vui lòng đăng nhập GVCN / Ban Cán Sự để thay đổi!', 'error');
+      return;
+    }
     if (
       confirm(
         `Bạn có chắc muốn tự động sắp xếp lại chỗ ngồi ${
@@ -240,6 +245,10 @@ export const SeatingPage: React.FC = () => {
   };
 
   const handleResetAllSeats = () => {
+    if (!canManageSeating) {
+      appState.showToast('🔒 CHẾ ĐỘ BẢO MẬT CAO: Vai trò Học Sinh chỉ được quyền xem. Vui lòng đăng nhập GVCN / Ban Cán Sự để thay đổi!', 'error');
+      return;
+    }
     if (confirm('⚠️ XÁC NHẬN: Bạn có chắc muốn LÀM TRỐNG TOÀN BỘ sơ đồ chỗ ngồi để xếp mới không?\n\nLưu ý: Hệ thống đã lưu sẵn Bản Dự Phòng. Nếu lỡ tay xóa, bạn chỉ cần bấm "↩️ Khôi phục Sơ đồ vừa làm" để quay lại ngay lập tức.')) {
       appState.createSeatingBackupSnapshot();
       seats.forEach((seat) => appState.assignStudentToSeat(seat.id, undefined));
@@ -248,6 +257,10 @@ export const SeatingPage: React.FC = () => {
   };
 
   const handleRestoreSeatingBackup = () => {
+    if (!canManageSeating) {
+      appState.showToast('🔒 CHẾ ĐỘ BẢO MẬT CAO: Vai trò Học Sinh chỉ được quyền xem. Vui lòng đăng nhập GVCN / Ban Cán Sự để thay đổi!', 'error');
+      return;
+    }
     const success = appState.restorePreviousSeatingBackup();
     if (success) {
       appState.showToast('↺ Đã khôi phục thành công sơ đồ chỗ ngồi về trạng thái trước đó!', 'success');
