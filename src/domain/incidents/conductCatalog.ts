@@ -187,3 +187,31 @@ export const OFFICIAL_CONDUCT_CATALOG: ConductRuleItem[] = [
     requiresTeacherPermissionCheck: true,
   },
 ];
+
+/**
+ * Format specific deduction rationale according to QĐ 525 regulations:
+ * Example output: "-2đ vì lý do Đi học trễ mốc quy định (Mã 08): Đi trễ 10 phút"
+ */
+export function formatIncidentDeductionRationale(
+  inc: { conduct_code?: string | null; base_deduction?: number; effective_deduction?: number; notes?: string; other_category_description?: string },
+  catalog: ConductRuleItem[] = OFFICIAL_CONDUCT_CATALOG
+): string {
+  const points = Math.abs(
+    (inc.effective_deduction && inc.effective_deduction !== 0)
+      ? inc.effective_deduction
+      : (inc.base_deduction || 2)
+  );
+
+  const rule = catalog.find((c) => c.code === inc.conduct_code);
+  const reasonName = rule
+    ? rule.shortTitle
+    : inc.conduct_code
+    ? `Vi phạm Mã ${inc.conduct_code}`
+    : 'Vi phạm nội quy';
+
+  const codeStr = inc.conduct_code ? ` (Mã ${inc.conduct_code})` : '';
+  const detailNotes = inc.notes || inc.other_category_description;
+  const notesStr = detailNotes && detailNotes.trim() ? `: ${detailNotes.trim()}` : '';
+
+  return `-${points}đ vì lý do ${reasonName}${codeStr}${notesStr}`;
+}

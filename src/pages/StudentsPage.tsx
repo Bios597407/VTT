@@ -3,6 +3,7 @@ import { appState } from '../services/appStateService';
 import { Student } from '../types';
 import { StatusBadge } from '../components/StatusBadge';
 import { tallyAttendance } from '../domain/attendance/attendanceRules';
+import { formatIncidentDeductionRationale } from '../domain/incidents/conductCatalog';
 import {
   Search,
   User,
@@ -501,18 +502,16 @@ export const StudentsPage: React.FC = () => {
                       appState.incidents
                         .filter((i) => i.student_id === selectedStudent.id)
                         .map((inc) => (
-                          <div key={inc.id} className="p-2.5 bg-white border border-slate-200 rounded-lg flex items-center justify-between">
-                            <div>
-                              <div className="font-semibold text-slate-800">
-                                {inc.conduct_code ? `Mã ${inc.conduct_code}` : 'Sự việc khác'}: {inc.notes || inc.other_category_description || 'Không ghi chú'}
-                              </div>
-                              <div className="text-[10px] text-slate-500">
-                                Ngày: {inc.date} • Buổi: {inc.session === 'morning' ? 'Sáng' : 'Chiều'} • Báo bởi: {inc.reported_by}
-                              </div>
+                          <div key={inc.id} className="p-2.5 bg-rose-50/40 border border-rose-200 rounded-xl space-y-1">
+                            <div className="font-bold text-rose-950 text-xs">
+                              {formatIncidentDeductionRationale(inc, appState.conductCatalog)}
                             </div>
-                            <div className="text-right flex flex-col items-end gap-1">
-                              <StatusBadge type={inc.incident_status} />
-                              <span className="font-bold text-rose-600">{inc.effective_deduction}đ</span>
+                            <div className="flex items-center justify-between text-[10px] text-slate-500 pt-1 border-t border-rose-100">
+                              <span>Ngày: {inc.date} · Buổi: {inc.session === 'morning' ? 'Sáng' : 'Chiều'} (Tiết {inc.period || 1})</span>
+                              <div className="flex items-center gap-1.5">
+                                <span>Báo bởi: {inc.reported_by}</span>
+                                <StatusBadge type={inc.incident_status} />
+                              </div>
                             </div>
                           </div>
                         ))

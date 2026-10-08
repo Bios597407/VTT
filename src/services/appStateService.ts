@@ -27,7 +27,7 @@ import { OFFICIAL_PENDING_RULES } from '../domain/scoring/pendingRules';
 import {
   calculateWeeklyScore,
 } from '../domain/scoring/scoringEngine';
-import { OFFICIAL_CONDUCT_CATALOG, ConductCatalogItem } from '../domain/incidents/conductCatalog';
+import { OFFICIAL_CONDUCT_CATALOG, ConductCatalogItem, formatIncidentDeductionRationale } from '../domain/incidents/conductCatalog';
 import { isSupabaseConfigured, supabase } from '../lib/supabaseClient';
 
 function generateUUID(): string {
@@ -512,6 +512,9 @@ class AppStateService {
       rewards: this.rewards,
       attendance: this.attendance,
       seats: this.seats,
+      seatingPlans: this.seatingPlans,
+      activeSeatingPlanId: this.activeSeatingPlanId,
+      dutyRoster: this.dutyRoster,
       tasks: this.tasks,
       positiveNotes: this.positiveNotes,
       pendingRules: this.pendingRules,
@@ -539,6 +542,21 @@ class AppStateService {
     this.showToast('✅ Đã tải về tệp sao lưu dữ liệu an toàn thành công!', 'success');
   }
 
+  public forceSaveToday(): { timestamp: string; studentCount: number; incidentCount: number; seatingPlanCount: number } {
+    this.saveLocalState();
+    const nowStr = new Date().toLocaleString('vi-VN');
+    const stats = {
+      timestamp: nowStr,
+      studentCount: this.students.length,
+      incidentCount: this.incidents.length,
+      seatingPlanCount: this.seatingPlans.length,
+    };
+
+    this.addAuditLog(this.currentUser.name, 'Lưu dữ liệu kết quả làm việc tức thời', 'checkpoint', 'manual_save');
+    this.showToast(`💾 ĐÃ LƯU DỮ LIỆU TỨC THỜI (${nowStr})!\n• 43 Học sinh · ${stats.seatingPlanCount} Sơ đồ · ${stats.incidentCount} Vi phạm`, 'success');
+    return stats;
+  }
+
   public importFullDatabaseBackup(jsonString: string): { success: boolean; message: string } {
     try {
       const parsed = JSON.parse(jsonString);
@@ -554,6 +572,9 @@ class AppStateService {
       if (Array.isArray(parsed.rewards)) this.rewards = parsed.rewards;
       if (Array.isArray(parsed.attendance)) this.attendance = parsed.attendance;
       if (Array.isArray(parsed.seats)) this.seats = parsed.seats;
+      if (Array.isArray(parsed.seatingPlans)) this.seatingPlans = parsed.seatingPlans;
+      if (typeof parsed.activeSeatingPlanId === 'string') this.activeSeatingPlanId = parsed.activeSeatingPlanId;
+      if (Array.isArray(parsed.dutyRoster)) this.dutyRoster = parsed.dutyRoster;
       if (Array.isArray(parsed.tasks)) this.tasks = parsed.tasks;
       if (Array.isArray(parsed.positiveNotes)) this.positiveNotes = parsed.positiveNotes;
       if (Array.isArray(parsed.pendingRules)) this.pendingRules = parsed.pendingRules;
@@ -1665,7 +1686,8 @@ class AppStateService {
       if (showViolatorNames) {
         approvedIncidents.slice(0, 5).forEach((inc) => {
           const stu = this.students.find((s) => s.id === inc.student_id);
-          text += `  - ${stu?.full_name || 'Học sinh'}: ${inc.notes || 'Nhắc nhở nề nếp'}\n`;
+          const rationale = formatIncidentDeductionRationale(inc, this.conductCatalog);
+          text += `  - ${stu?.full_name || 'Học sinh'}: ${rationale}\n`;
         });
       }
     }

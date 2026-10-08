@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { appState } from '../services/appStateService';
 import { StatusBadge } from '../components/StatusBadge';
+import { formatIncidentDeductionRationale } from '../domain/incidents/conductCatalog';
 import {
   calculateMonthlyScore,
   calculateSemesterNumericScore,
@@ -201,6 +202,9 @@ export const ScoringPage: React.FC = () => {
                     <th className="py-3 px-4">Điểm gốc</th>
                     <th className="py-3 px-4 text-emerald-700">Thưởng (+)</th>
                     <th className="py-3 px-4 text-rose-700">Trừ (-)</th>
+                    <th className="py-3 px-4 bg-rose-50/60 text-rose-900 border-x border-rose-100">
+                      📌 Nguyên nhân bị trừ điểm (QĐ 525)
+                    </th>
                     <th className="py-3 px-4">Điểm thô</th>
                     <th className="py-3 px-4 font-black text-blue-700">Điểm chính thức</th>
                     <th className="py-3 px-4">Phiên bản</th>
@@ -211,6 +215,8 @@ export const ScoringPage: React.FC = () => {
                     const snap = weeklySnapshots.find(
                       (s) => s.student_id === stu.id && s.week_number === selectedWeek && s.is_current
                     );
+                    const stuIncidents = incidents.filter((i) => i.student_id === stu.id && i.incident_status === 'approved');
+
                     return (
                       <tr key={stu.id} className="hover:bg-slate-50">
                         <td className="py-3 px-4 text-slate-500 font-mono">{idx + 1}</td>
@@ -222,6 +228,19 @@ export const ScoringPage: React.FC = () => {
                         </td>
                         <td className="py-3 px-4 font-mono text-rose-600 font-bold">
                           {snap ? snap.deduction_points : 0}
+                        </td>
+                        <td className="py-3 px-4 bg-rose-50/20 border-x border-rose-100 text-[11px]">
+                          {stuIncidents.length === 0 ? (
+                            <span className="text-emerald-700 font-semibold">✅ Nề nếp tốt, 0 vi phạm</span>
+                          ) : (
+                            <div className="space-y-1">
+                              {stuIncidents.map((inc) => (
+                                <div key={inc.id} className="text-rose-900 font-extrabold">
+                                  {formatIncidentDeductionRationale(inc, appState.conductCatalog)}
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </td>
                         <td className="py-3 px-4 font-mono text-slate-600">
                           {snap?.raw_week_score ?? '8.0'}

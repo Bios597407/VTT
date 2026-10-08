@@ -254,15 +254,27 @@ export const StudentReportCardModal: React.FC<Props> = ({
                   <div className="space-y-1.5 p-3 bg-rose-50/60 border border-rose-200 rounded-xl">
                     <div className="font-bold text-rose-900 flex items-center gap-1.5">
                       <AlertTriangle className="w-4 h-4 text-rose-700" />
-                      Ghi Nhận Nhắc Nhở Vi Phạm:
+                      Ghi Nhận Vi Phạm & Lý Giải Nguyên Nhân Trừ Điểm:
                     </div>
                     {stuIncidents.length === 0 ? (
-                      <div className="text-emerald-800 font-medium text-[11px]">Không có vi phạm nội quy.</div>
+                      <div className="text-emerald-800 font-medium text-[11px]">✅ Tuyên dương: Không có vi phạm nội quy.</div>
                     ) : (
-                      <ul className="list-disc list-inside text-slate-800 space-y-1">
-                        {stuIncidents.map((inc) => (
-                          <li key={inc.id}>{inc.notes || 'Nhắc nhở nề nếp'} (-{inc.effective_deduction}đ)</li>
-                        ))}
+                      <ul className="space-y-1.5 text-slate-800 text-[11px]">
+                        {stuIncidents.map((inc) => {
+                          const catalogItem = appState.conductCatalog.find((c) => c.code === inc.conduct_code);
+                          const title = catalogItem ? catalogItem.title : (inc.conduct_code ? `Lỗi Mã ${inc.conduct_code}` : 'Sự việc khác');
+                          return (
+                            <li key={inc.id} className="p-1.5 bg-white rounded border border-rose-100 shadow-2xs">
+                              <div className="font-bold text-rose-900 flex items-center justify-between">
+                                <span>• [Mã {inc.conduct_code || 'Khác'}] {title}</span>
+                                <span className="font-mono text-rose-700 font-extrabold">-{inc.effective_deduction}đ</span>
+                              </div>
+                              <div className="text-slate-600 text-[10px] mt-0.5">
+                                <strong>Lý do trừ điểm:</strong> {inc.notes || inc.other_category_description || 'Nhắc nhở nề nếp lớp học'}
+                              </div>
+                            </li>
+                          );
+                        })}
                       </ul>
                     )}
                   </div>

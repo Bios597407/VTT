@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { appState } from '../services/appStateService';
 import { Incident } from '../types';
 import { StatusBadge } from '../components/StatusBadge';
-import { OFFICIAL_CONDUCT_CATALOG } from '../domain/incidents/conductCatalog';
+import { OFFICIAL_CONDUCT_CATALOG, formatIncidentDeductionRationale } from '../domain/incidents/conductCatalog';
 import {
   AlertTriangle,
   Plus,
@@ -308,17 +308,20 @@ export const IncidentsPage: React.FC<Props> = ({ onOpenQuickIncident }) => {
                 <th className="py-3 px-4">Ngày / Buổi</th>
                 <th className="py-3 px-4">Mã số HS</th>
                 <th className="py-3 px-4">Họ và tên</th>
-                <th className="py-3 px-4">Mã lỗi / Sự việc</th>
+                <th className="py-3 px-4">Mã vi phạm</th>
+                <th className="py-3 px-4 min-w-[260px] bg-rose-50/50 text-rose-900 border-x border-rose-100">
+                  📌 Lý giải nguyên nhân trừ điểm (QĐ 525 & Mô tả)
+                </th>
                 <th className="py-3 px-4">Người báo</th>
                 <th className="py-3 px-4">Trạng thái</th>
-                <th className="py-3 px-4">Hiệu lực điểm</th>
+                <th className="py-3 px-4">Điểm trừ</th>
                 <th className="py-3 px-4 text-right">Thao tác</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {displayList.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="text-center py-8 text-slate-400">
+                  <td colSpan={9} className="text-center py-8 text-slate-400">
                     Không có sự việc vi phạm nào trong mục này.
                   </td>
                 </tr>
@@ -326,6 +329,10 @@ export const IncidentsPage: React.FC<Props> = ({ onOpenQuickIncident }) => {
                 displayList.map((inc) => {
                   const student = students.find((s) => s.id === inc.student_id);
                   const catalogItem = conductCatalog.find((c) => c.code === inc.conduct_code);
+
+                  // Rationale / Explanation string
+                  const ruleTitle = catalogItem ? catalogItem.title : (inc.conduct_code ? `Mã vi phạm ${inc.conduct_code}` : 'Sự việc khác');
+                  const rationaleText = inc.notes || inc.other_category_description || 'Ghi nhận vi phạm quy định nề nếp lớp học.';
 
                   return (
                     <tr key={inc.id} className="hover:bg-slate-50/80 transition">
@@ -346,16 +353,24 @@ export const IncidentsPage: React.FC<Props> = ({ onOpenQuickIncident }) => {
                           </span>
                         )}
                       </td>
-                      <td className="py-3 px-4 max-w-xs">
-                        <div className="font-bold text-slate-800">
-                          {inc.conduct_code ? (
-                            <span className="text-rose-700">Mã {inc.conduct_code}: {catalogItem?.shortTitle || catalogItem?.title}</span>
-                          ) : (
-                            <span className="text-purple-700">Sự việc khác — chờ xem xét</span>
-                          )}
+                      <td className="py-3 px-4 whitespace-nowrap">
+                        {inc.conduct_code ? (
+                          <span className="font-extrabold text-rose-700 bg-rose-50 px-2 py-0.5 rounded border border-rose-200 font-mono">
+                            Mã {inc.conduct_code}
+                          </span>
+                        ) : (
+                          <span className="font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded border border-purple-200">
+                            Khác
+                          </span>
+                        )}
+                      </td>
+                      {/* DEDICATED COLUMN: Lý giải nguyên nhân trừ điểm */}
+                      <td className="py-3 px-4 bg-rose-50/30 border-x border-rose-100">
+                        <div className="font-extrabold text-rose-900 text-xs">
+                          {formatIncidentDeductionRationale(inc, conductCatalog)}
                         </div>
-                        <div className="text-[11px] text-slate-500 truncate">
-                          {inc.notes || inc.other_category_description || '—'}
+                        <div className="text-[10px] text-slate-500 mt-1 italic">
+                          * Căn cứ QĐ 525/QĐ-THPT.VTT (Điểm trừ gốc: -{Math.abs(inc.base_deduction || 2)}đ)
                         </div>
                       </td>
                       <td className="py-3 px-4 text-slate-600">
@@ -365,15 +380,13 @@ export const IncidentsPage: React.FC<Props> = ({ onOpenQuickIncident }) => {
                       <td className="py-3 px-4">
                         <StatusBadge type={inc.incident_status} />
                       </td>
-                      <td className="py-3 px-4">
+                      <td className="py-3 px-4 font-extrabold font-mono text-rose-700">
                         {inc.score_effect_status === 'confirmed_effect' ? (
-                          <span className="font-bold text-rose-600 font-mono">
-                            {inc.effective_deduction}đ
-                          </span>
+                          <span className="text-rose-600">-{Math.abs(inc.effective_deduction)}đ</span>
                         ) : inc.score_effect_status === 'pending_rule' ? (
                           <StatusBadge type="pending_rule" label="Treo quy tắc (0đ)" />
                         ) : (
-                          <span className="text-slate-400">0đ (Không trừ)</span>
+                          <span className="text-slate-400 font-normal">0đ</span>
                         )}
                       </td>
                       <td className="py-3 px-4 text-right">

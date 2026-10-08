@@ -4,6 +4,7 @@ import { ExcelService } from '../services/excelService';
 import { FileSpreadsheet, Printer, Download, FileText, CheckCircle2, MessageCircle, FileCheck, Sparkles } from 'lucide-react';
 import { ZaloReportModal } from '../components/ZaloReportModal';
 import { StudentReportCardModal } from '../components/StudentReportCardModal';
+import { formatIncidentDeductionRationale } from '../domain/incidents/conductCatalog';
 
 export const ReportsPage: React.FC = () => {
   const students = appState.students;
@@ -227,16 +228,23 @@ export const ReportsPage: React.FC = () => {
                   <th className="p-2 border border-slate-300">Họ và tên</th>
                   <th className="p-2 border border-slate-300 text-center">Gốc</th>
                   <th className="p-2 border border-slate-300 text-center">Thưởng</th>
-                  <th className="p-2 border border-slate-300 text-center">Phạt</th>
+                  <th className="p-2 border border-slate-300 text-center text-rose-800">Trừ</th>
                   <th className="p-2 border border-slate-300 text-center font-bold">Điểm số</th>
-                  <th className="p-2 border border-slate-300">Ghi chú nề nếp</th>
+                  <th className="p-2 border border-slate-300 min-w-[220px]">📌 Lý giải nguyên nhân trừ điểm (QĐ 525)</th>
                 </tr>
               </thead>
               <tbody>
                 {students.map((stu, idx) => {
                   const snap = weeklySnapshots.find((s) => s.student_id === stu.id && s.is_current);
-                  const hasIncident = incidents.some((inc) => inc.student_id === stu.id);
-                  const noteText = hasIncident ? 'Có ghi nhận nề nếp' : 'Nề nếp ổn định';
+                  const stuIncidents = incidents.filter((inc) => inc.student_id === stu.id && inc.incident_status === 'approved');
+
+                  // Format reasons string according to QĐ 525
+                  let rationaleDisplay = '✅ Nề nếp tốt, không bị trừ điểm';
+                  if (stuIncidents.length > 0) {
+                    rationaleDisplay = stuIncidents
+                      .map((inc) => formatIncidentDeductionRationale(inc, appState.conductCatalog))
+                      .join(' | ');
+                  }
 
                   return (
                     <tr key={stu.id} className="border-b border-slate-200 hover:bg-slate-50">
@@ -247,14 +255,14 @@ export const ReportsPage: React.FC = () => {
                       <td className="p-1.5 border border-slate-300 text-center text-emerald-700 font-medium">
                         +{snap?.reward_points ?? 0}
                       </td>
-                      <td className="p-1.5 border border-slate-300 text-center text-rose-700 font-medium">
+                      <td className="p-1.5 border border-slate-300 text-center text-rose-700 font-bold font-mono">
                         -{snap?.deduction_points ?? 0}
                       </td>
-                      <td className="p-1.5 border border-slate-300 text-center font-bold text-blue-800">
+                      <td className="p-1.5 border border-slate-300 text-center font-black text-blue-900 font-mono text-xs">
                         {snap?.official_week_score ?? '8.0'}
                       </td>
-                      <td className="p-1.5 border border-slate-300 text-slate-600 text-[11px]">
-                        {noteText}
+                      <td className="p-1.5 border border-slate-300 text-slate-700 text-[11px] leading-snug">
+                        {rationaleDisplay}
                       </td>
                     </tr>
                   );

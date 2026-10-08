@@ -11,6 +11,7 @@ import {
   ShieldCheck,
   Lock,
   LogOut,
+  Save,
 } from 'lucide-react';
 
 interface Props {
@@ -76,11 +77,19 @@ export const Navbar: React.FC<Props> = ({
             {isOfficer ? (
               <>
                 <button
+                  onClick={() => appState.forceSaveToday()}
+                  className="min-h-[38px] flex items-center gap-1.5 px-3 py-1.5 bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-bold rounded-lg shadow-xs transition active:scale-95 cursor-pointer border border-emerald-500/30"
+                  title="Lưu tất cả kết quả làm việc hôm nay vào hệ thống"
+                >
+                  <Save className="w-3.5 h-3.5 text-emerald-200" />
+                  <span>Lưu Dữ Liệu Hôm Nay</span>
+                </button>
+                <button
                   onClick={onOpenQuickAttendance}
-                  className="min-h-[38px] flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold rounded-lg shadow-xs transition active:scale-95 cursor-pointer"
+                  className="min-h-[38px] flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold rounded-lg shadow-xs transition active:scale-95 cursor-pointer"
                 >
                   <UserCheck className="w-3.5 h-3.5" />
-                  <span>Điểm danh nhanh</span>
+                  <span>Điểm danh</span>
                 </button>
                 <button
                   onClick={onOpenQuickIncident}

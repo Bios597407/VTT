@@ -220,11 +220,20 @@ export const SettingsPage: React.FC = () => {
             <div className="flex flex-wrap items-center gap-2.5">
               <button
                 type="button"
+                onClick={() => appState.forceSaveToday()}
+                className="px-4 py-2 bg-blue-500 hover:bg-blue-400 text-slate-950 font-black text-xs rounded-xl shadow-md transition active:scale-95 cursor-pointer flex items-center gap-1.5"
+              >
+                <HardDrive className="w-4 h-4" />
+                <span>💾 Lưu Kết Quả Hôm Nay Tức Thời</span>
+              </button>
+
+              <button
+                type="button"
                 onClick={() => appState.exportFullDatabaseBackup()}
                 className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs rounded-xl shadow-md transition active:scale-95 cursor-pointer flex items-center gap-1.5"
               >
                 <Download className="w-4 h-4" />
-                <span>Tải về Bản Sao Lưu (.json)</span>
+                <span>Tải về Tệp Sao Lưu (.json)</span>
               </button>
 
               <label className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white font-bold text-xs rounded-xl border border-white/20 transition active:scale-95 cursor-pointer flex items-center gap-1.5">

@@ -13,6 +13,12 @@ export const TasksPage: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState<'tasks' | 'duty'>('duty');
 
+  const canManageTasks =
+    Boolean(currentUser.isAuthenticatedOfficer) &&
+    (currentUser.role === 'gvcn' ||
+      currentUser.role === 'lop_truong' ||
+      currentUser.role === 'lop_pho');
+
   const [showModal, setShowModal] = useState(false);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -76,7 +82,7 @@ export const TasksPage: React.FC = () => {
             </button>
           </div>
 
-          {activeTab === 'tasks' && (
+          {activeTab === 'tasks' && canManageTasks && (
             <button
               onClick={() => setShowModal(true)}
               className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-sm transition active:scale-95 cursor-pointer"
