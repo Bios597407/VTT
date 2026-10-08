@@ -38,13 +38,7 @@ export function App() {
   const [showQuickAttendance, setShowQuickAttendance] = useState(false);
   const [showQuickIncident, setShowQuickIncident] = useState(false);
   const [showExcelImport, setShowExcelImport] = useState(false);
-  const [showAuthModal, setShowAuthModal] = useState(() => {
-    // Show login window initially if not authenticated as officer
-    if (typeof window !== 'undefined') {
-      return !localStorage.getItem('VTT_OFFICER_SESSION');
-    }
-    return true;
-  });
+  const [showAuthModal, setShowAuthModal] = useState(false);
   const [pendingTabAfterAuth, setPendingTabAfterAuth] = useState<NavTab | null>(null);
   const [authPromptMessage, setAuthPromptMessage] = useState<string | null>(null);
 
@@ -70,6 +64,12 @@ export function App() {
     const isOfficer = appState.currentUser.isAuthenticatedOfficer;
     const isGvcn = appState.currentUser.role === 'gvcn';
 
+    // GVCN toàn quyền truy cập toàn bộ các tab không có hạn chế, không có vùng cấm
+    if (isGvcn) {
+      setActiveTab(tab);
+      return;
+    }
+
     if (RESTRICTED_TABS[tab]) {
       const config = RESTRICTED_TABS[tab];
       if (!isOfficer) {
@@ -92,7 +92,7 @@ export function App() {
   };
 
   const handleOpenAttendance = () => {
-    if (!appState.currentUser.isAuthenticatedOfficer) {
+    if (!appState.currentUser.isAuthenticatedOfficer && appState.currentUser.role !== 'gvcn') {
       setAuthPromptMessage('🔒 Chức năng Điểm danh yêu cầu quyền Ban Cán sự hoặc GVCN. Vui lòng đăng nhập!');
       setShowAuthModal(true);
       return;
@@ -101,7 +101,7 @@ export function App() {
   };
 
   const handleOpenIncident = () => {
-    if (!appState.currentUser.isAuthenticatedOfficer) {
+    if (!appState.currentUser.isAuthenticatedOfficer && appState.currentUser.role !== 'gvcn') {
       setAuthPromptMessage('🔒 Chức năng Báo sự việc vi phạm yêu cầu quyền Ban Cán sự hoặc GVCN. Vui lòng đăng nhập!');
       setShowAuthModal(true);
       return;
@@ -110,7 +110,7 @@ export function App() {
   };
 
   const handleOpenExcelImport = () => {
-    if (!appState.currentUser.isAuthenticatedOfficer) {
+    if (!appState.currentUser.isAuthenticatedOfficer && appState.currentUser.role !== 'gvcn') {
       setAuthPromptMessage('🔒 Chức năng Nhập Excel yêu cầu quyền Ban Cán sự hoặc GVCN. Vui lòng đăng nhập!');
       setShowAuthModal(true);
       return;

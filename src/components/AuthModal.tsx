@@ -252,8 +252,8 @@ export const AuthModal: React.FC<Props> = ({ isOpen, onClose, promptMessage, onS
                         : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
                     }`}
                   >
-                    <div className="truncate font-black">{classInfo.gvcn_name.split(' ').slice(-2).join(' ') || 'GVCN'}</div>
-                    <div className="text-xs opacity-80 font-semibold mt-0.5">(GVCN)</div>
+                    <div className="font-black text-sm">GVCN</div>
+                    <div className="text-xs opacity-80 font-semibold mt-0.5">Toàn quyền</div>
                   </button>
 
                   <button
@@ -265,8 +265,8 @@ export const AuthModal: React.FC<Props> = ({ isOpen, onClose, promptMessage, onS
                         : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
                     }`}
                   >
-                    <div className="truncate font-black">{classInfo.class_president_name.split(' ').slice(-2).join(' ') || 'Lớp trưởng'}</div>
-                    <div className="text-xs opacity-80 font-semibold mt-0.5">(Lớp trưởng)</div>
+                    <div className="font-black text-sm">Lớp trưởng</div>
+                    <div className="text-xs opacity-80 font-semibold mt-0.5">Ban Cán Sự</div>
                   </button>
 
                   <button
@@ -278,8 +278,8 @@ export const AuthModal: React.FC<Props> = ({ isOpen, onClose, promptMessage, onS
                         : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
                     }`}
                   >
-                    <div className="truncate font-black">{classInfo.class_vice_discipline_name.split(' ').slice(-2).join(' ') || 'Lớp phó'}</div>
-                    <div className="text-xs opacity-80 font-semibold mt-0.5">(Lớp phó)</div>
+                    <div className="font-black text-sm">Lớp phó</div>
+                    <div className="text-xs opacity-80 font-semibold mt-0.5">Ban Cán Sự</div>
                   </button>
                 </div>
               </div>

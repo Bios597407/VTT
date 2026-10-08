@@ -63,8 +63,6 @@ export const ClassManagementPage: React.FC<Props> = ({ onNavigate, onOpenAuthMod
 
   const [officerForm, setOfficerForm] = useState({
     gvcn_name: classInfo.gvcn_name,
-    gvcn_email: classInfo.gvcn_email,
-    gvcn_phone: classInfo.gvcn_phone,
     class_president_name: classInfo.class_president_name,
     class_vice_discipline_name: classInfo.class_vice_discipline_name,
     class_vice_academic_name: classInfo.class_vice_academic_name,
@@ -109,8 +107,6 @@ export const ClassManagementPage: React.FC<Props> = ({ onNavigate, onOpenAuthMod
   const handleOpenEditOfficers = () => {
     setOfficerForm({
       gvcn_name: classInfo.gvcn_name,
-      gvcn_email: classInfo.gvcn_email,
-      gvcn_phone: classInfo.gvcn_phone,
       class_president_name: classInfo.class_president_name,
       class_vice_discipline_name: classInfo.class_vice_discipline_name,
       class_vice_academic_name: classInfo.class_vice_academic_name,
@@ -129,8 +125,6 @@ export const ClassManagementPage: React.FC<Props> = ({ onNavigate, onOpenAuthMod
     // 1. Cập nhật thông tin Ban Cán sự & GVCN
     await appState.updateClassInfo({
       gvcn_name: officerForm.gvcn_name.trim(),
-      gvcn_email: officerForm.gvcn_email.trim(),
-      gvcn_phone: officerForm.gvcn_phone.trim(),
       class_president_name: officerForm.class_president_name.trim(),
       class_vice_discipline_name: officerForm.class_vice_discipline_name.trim(),
       class_vice_academic_name: officerForm.class_vice_academic_name.trim(),
@@ -440,114 +434,99 @@ export const ClassManagementPage: React.FC<Props> = ({ onNavigate, onOpenAuthMod
               )}
             </div>
 
-            <div className="space-y-3 text-xs">
+            <div className="space-y-3.5 text-sm">
               {/* GVCN */}
-              <div className="p-3.5 bg-blue-50/70 rounded-xl border border-blue-200 flex items-center justify-between">
+              <div className="p-4 bg-blue-50/80 rounded-2xl border-2 border-blue-200 flex items-center justify-between">
                 <div>
-                  <div className="text-xs font-extrabold uppercase tracking-wider text-blue-700">
+                  <div className="text-xs font-black uppercase tracking-wider text-blue-700">
                     Giáo viên Chủ nhiệm (GVCN)
                   </div>
-                  <div className="font-black text-slate-900 text-base mt-0.5">{classInfo.gvcn_name}</div>
-                  <div className="text-xs text-slate-600 mt-1 space-y-0.5">
-                    {canManageClass && classInfo.gvcn_email ? (
-                      <div className="flex items-center gap-1.5 font-mono text-xs text-blue-800">
-                        <Mail className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                        <span className="truncate">{classInfo.gvcn_email}</span>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-1.5 text-xs text-slate-500">
-                        <School className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                        <span>{classInfo.room_number} · THPT Võ Trường Toản</span>
-                      </div>
-                    )}
-                    {canManageClass && classInfo.gvcn_phone && (
-                      <div className="flex items-center gap-1.5 text-xs text-slate-700">
-                        <Phone className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                        <span>{classInfo.gvcn_phone}</span>
-                      </div>
-                    )}
+                  <div className="font-black text-slate-900 text-lg sm:text-xl mt-1">{classInfo.gvcn_name}</div>
+                  <div className="text-sm text-slate-600 mt-1 flex items-center gap-2 font-medium">
+                    <School className="w-4 h-4 text-blue-600 shrink-0" />
+                    <span>{classInfo.room_number} · THPT Võ Trường Toản</span>
                   </div>
                 </div>
-                <span className="px-2.5 py-1 text-xs font-black bg-blue-600 text-white rounded-lg shadow-xs">
+                <span className="px-3 py-1 text-xs font-black bg-blue-600 text-white rounded-xl shadow-xs">
                   Toàn quyền
                 </span>
               </div>
 
               {/* Lớp trưởng */}
-              <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between">
+              <div className="p-4 bg-slate-50/90 rounded-2xl border-2 border-slate-200 flex items-center justify-between">
                 <div>
-                  <div className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">
+                  <div className="text-xs font-black uppercase tracking-wider text-slate-600">
                     Lớp trưởng
                   </div>
-                  <div className="font-bold text-slate-900 text-sm mt-0.5">
+                  <div className="font-black text-slate-900 text-base sm:text-lg mt-1">
                     {classInfo.class_president_name}
                   </div>
-                  <div className="text-[10px] text-slate-400 mt-0.5">Phụ trách chung toàn lớp</div>
+                  <div className="text-xs text-slate-500 font-medium mt-0.5">Phụ trách điều hành chung toàn lớp</div>
                 </div>
-                <span className="px-2 py-0.5 text-[10px] font-bold bg-emerald-100 text-emerald-800 rounded-md">
+                <span className="px-2.5 py-1 text-xs font-black bg-emerald-100 text-emerald-800 rounded-lg">
                   Ban Cán Sự
                 </span>
               </div>
 
               {/* Lớp phó Kỷ luật */}
-              <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between">
+              <div className="p-4 bg-slate-50/90 rounded-2xl border-2 border-slate-200 flex items-center justify-between">
                 <div>
-                  <div className="text-[10px] font-extrabold uppercase tracking-wider text-rose-600">
+                  <div className="text-xs font-black uppercase tracking-wider text-rose-700">
                     Lớp phó Kỷ luật & Nề nếp
                   </div>
-                  <div className="font-bold text-slate-900 text-sm mt-0.5">
+                  <div className="font-black text-slate-900 text-base sm:text-lg mt-1">
                     {classInfo.class_vice_discipline_name}
                   </div>
-                  <div className="text-[10px] text-slate-400 mt-0.5">Quản lý vi phạm & chấm điểm nề nếp</div>
+                  <div className="text-xs text-slate-500 font-medium mt-0.5">Quản lý vi phạm & chấm điểm nề nếp</div>
                 </div>
-                <span className="px-2 py-0.5 text-[10px] font-bold bg-emerald-100 text-emerald-800 rounded-md">
+                <span className="px-2.5 py-1 text-xs font-black bg-emerald-100 text-emerald-800 rounded-lg">
                   Ban Cán Sự
                 </span>
               </div>
 
               {/* Lớp phó Học tập */}
-              <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between">
+              <div className="p-4 bg-slate-50/90 rounded-2xl border-2 border-slate-200 flex items-center justify-between">
                 <div>
-                  <div className="text-[10px] font-extrabold uppercase tracking-wider text-indigo-600">
+                  <div className="text-xs font-black uppercase tracking-wider text-indigo-700">
                     Lớp phó Học tập
                   </div>
-                  <div className="font-bold text-slate-900 text-sm mt-0.5">
+                  <div className="font-black text-slate-900 text-base sm:text-lg mt-1">
                     {classInfo.class_vice_academic_name}
                   </div>
-                  <div className="text-[10px] text-slate-400 mt-0.5">Theo dõi học vụ & bài tập</div>
+                  <div className="text-xs text-slate-500 font-medium mt-0.5">Theo dõi học vụ & sổ đầu bài</div>
                 </div>
-                <span className="px-2 py-0.5 text-[10px] font-bold bg-indigo-50 text-indigo-700 rounded-md">
+                <span className="px-2.5 py-1 text-xs font-black bg-indigo-50 text-indigo-800 rounded-lg">
                   Học vụ
                 </span>
               </div>
 
               {/* Bí thư */}
-              <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between">
+              <div className="p-4 bg-slate-50/90 rounded-2xl border-2 border-slate-200 flex items-center justify-between">
                 <div>
-                  <div className="text-[10px] font-extrabold uppercase tracking-wider text-amber-700">
+                  <div className="text-xs font-black uppercase tracking-wider text-amber-800">
                     Bí thư Chi đoàn
                   </div>
-                  <div className="font-bold text-slate-900 text-sm mt-0.5">
+                  <div className="font-black text-slate-900 text-base sm:text-lg mt-1">
                     {classInfo.secretary_name}
                   </div>
-                  <div className="text-[10px] text-slate-400 mt-0.5">Phong trào Đoàn thanh niên</div>
+                  <div className="text-xs text-slate-500 font-medium mt-0.5">Phong trào Đoàn thanh niên</div>
                 </div>
-                <span className="px-2 py-0.5 text-[10px] font-bold bg-amber-50 text-amber-800 rounded-md">
+                <span className="px-2.5 py-1 text-xs font-black bg-amber-50 text-amber-800 rounded-lg">
                   Đoàn TN
                 </span>
               </div>
 
               {/* 4 Tổ trưởng */}
-              <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-1.5">
-                <div className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 mb-1">
+              <div className="p-4 bg-slate-50/90 rounded-2xl border-2 border-slate-200 space-y-2">
+                <div className="text-xs font-black uppercase tracking-wider text-slate-700 mb-1">
                   4 Tổ trưởng Tự quản:
                 </div>
                 {groups.map((g) => {
                   const leader = students.find((s) => s.id === g.leader_student_id);
                   return (
-                    <div key={g.id} className="flex items-center justify-between text-xs py-0.5 border-b border-slate-100 last:border-0">
-                      <span className="font-semibold text-slate-700">Tổ {g.group_number}:</span>
-                      <span className="font-bold text-slate-900">{leader ? leader.full_name : 'Chưa gán'}</span>
+                    <div key={g.id} className="flex items-center justify-between text-sm py-1 border-b border-slate-200/60 last:border-0">
+                      <span className="font-bold text-slate-600">Tổ {g.group_number}:</span>
+                      <span className="font-black text-slate-900">{leader ? leader.full_name : g.leader_student_id || 'Chưa gán'}</span>
                     </div>
                   );
                 })}
@@ -711,42 +690,20 @@ export const ClassManagementPage: React.FC<Props> = ({ onNavigate, onOpenAuthMod
 
             <form onSubmit={handleSaveOfficers} className="p-5 space-y-4 text-xs max-h-[75vh] overflow-y-auto">
               {/* PHẦN 1: THÔNG TIN GVCN */}
-              <div className="p-3.5 bg-blue-50 rounded-xl border border-blue-200 text-blue-900 space-y-2.5">
-                <div className="font-black text-xs flex items-center gap-1.5">
-                  <School className="w-4 h-4 text-blue-700" />
+              <div className="p-4 bg-blue-50/80 rounded-2xl border-2 border-blue-200 text-blue-900 space-y-2">
+                <div className="font-black text-sm flex items-center gap-2">
+                  <School className="w-5 h-5 text-blue-700" />
                   <span>1. Thông tin Giáo viên Chủ nhiệm (GVCN):</span>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-700 mb-0.5">Họ và tên GVCN</label>
-                    <input
-                      type="text"
-                      required
-                      value={officerForm.gvcn_name}
-                      onChange={(e) => setOfficerForm({ ...officerForm, gvcn_name: e.target.value })}
-                      className="w-full p-2 border rounded-lg bg-white border-slate-300 text-xs font-bold"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-700 mb-0.5">Email GVCN (Gmail)</label>
-                    <input
-                      type="email"
-                      required
-                      value={officerForm.gvcn_email}
-                      onChange={(e) => setOfficerForm({ ...officerForm, gvcn_email: e.target.value })}
-                      className="w-full p-2 border rounded-lg bg-white border-slate-300 text-xs font-mono"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-700 mb-0.5">Số điện thoại GVCN</label>
-                    <input
-                      type="text"
-                      value={officerForm.gvcn_phone}
-                      onChange={(e) => setOfficerForm({ ...officerForm, gvcn_phone: e.target.value })}
-                      placeholder="0908 xxx xxx"
-                      className="w-full p-2 border rounded-lg bg-white border-slate-300 text-xs"
-                    />
-                  </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Họ và tên GVCN (Toàn quyền thay đổi):</label>
+                  <input
+                    type="text"
+                    required
+                    value={officerForm.gvcn_name}
+                    onChange={(e) => setOfficerForm({ ...officerForm, gvcn_name: e.target.value })}
+                    className="w-full p-3 border-2 rounded-xl bg-white border-slate-300 text-base font-black text-slate-900"
+                  />
                 </div>
               </div>
 
@@ -1025,7 +982,7 @@ export const ClassManagementPage: React.FC<Props> = ({ onNavigate, onOpenAuthMod
 
             <form onSubmit={handleSavePins} className="p-5 space-y-3.5 text-xs">
               <div>
-                <label className="block font-bold text-slate-800 mb-1">Mã PIN GVCN (Thầy Tân)</label>
+                <label className="block font-bold text-slate-800 mb-1">Mã PIN Giáo viên Chủ nhiệm ({classInfo.gvcn_name})</label>
                 <input
                   type="text"
                   required

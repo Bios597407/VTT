@@ -55,6 +55,9 @@ export const SettingsPage: React.FC = () => {
 
   // Editing account state
   const [editingAccId, setEditingAccId] = useState<string | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editTitle, setEditTitle] = useState('');
+  const [editRole, setEditRole] = useState<'gvcn' | 'lop_truong' | 'lop_pho'>('gvcn');
   const [editEmail, setEditEmail] = useState('');
   const [editPin, setEditPin] = useState('');
 
@@ -80,7 +83,7 @@ export const SettingsPage: React.FC = () => {
       pin: newPin.trim() || '10A16',
     });
 
-    appState.showToast(`Đã thêm tài khoản Gmail quản trị: ${newEmail.trim()}!`, 'success');
+    appState.showToast(`Đã thêm tài khoản cán bộ: ${newName.trim()} (${newEmail.trim()})!`, 'success');
     setNewName('');
     setNewEmail('');
     setNewPin('');
@@ -88,24 +91,30 @@ export const SettingsPage: React.FC = () => {
 
   const handleStartEditAcc = (acc: OfficerAccount) => {
     setEditingAccId(acc.id);
+    setEditName(acc.name);
+    setEditTitle(acc.title);
+    setEditRole(acc.role as any);
     setEditEmail(acc.email);
     setEditPin(acc.pin);
   };
 
   const handleSaveEditAcc = (id: string) => {
-    if (!editEmail.trim()) return;
+    if (!editName.trim() || !editEmail.trim()) return;
     appState.updateOfficerAccount(id, {
+      name: editName.trim(),
+      title: editTitle.trim(),
+      role: editRole,
       email: editEmail.trim().toLowerCase(),
       pin: editPin.trim() || '1016',
     });
-    appState.showToast('Đã cập nhật thông tin tài khoản cán bộ!', 'success');
+    appState.showToast('✅ Đã lưu cập nhật toàn quyền thông tin cán bộ!', 'success');
     setEditingAccId(null);
   };
 
   const handleDeleteAcc = (acc: OfficerAccount) => {
-    if (confirm(`Bạn có chắc chắn muốn xóa quyền của tài khoản ${acc.name} (${acc.email}) không?`)) {
+    if (confirm(`Bạn có chắc chắn muốn xóa tài khoản [${acc.name}] (${acc.email}) không?`)) {
       appState.deleteOfficerAccount(acc.id);
-      appState.showToast(`Đã xóa tài khoản ${acc.email}!`, 'info');
+      appState.showToast(`Đã xóa tài khoản ${acc.name}!`, 'info');
     }
   };
 
@@ -403,107 +412,176 @@ export const SettingsPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Officers & Gmail Whitelist Management Card */}
-      <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
-          <div className="flex items-center gap-2">
-            <Mail className="w-5 h-5 text-rose-600" />
+      {/* Officers & Accounts Management Card (GVCN TOÀN QUYỀN THAY ĐỔI KHÔNG CÓ VÙNG CẤM) */}
+      <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+          <div className="flex items-center gap-2.5">
+            <ShieldCheck className="w-6 h-6 text-emerald-600 shrink-0" />
             <div>
-              <h3 className="font-bold text-sm text-slate-900">
-                Ủy quyền Quản trị & Danh sách Gmail Cán sự
-              </h3>
-              <p className="text-[11px] text-slate-500">
-                Kiểm soát quyền: Chỉ các email Gmail & Mã PIN này mới có quyền điều chỉnh nề nếp. Học sinh chỉ được xem.
+              <div className="flex items-center gap-2">
+                <h3 className="font-black text-sm sm:text-base text-slate-900 tracking-tight">
+                  Quản trị Nhân sự & Danh sách Cán bộ Điều hành Lớp
+                </h3>
+                <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 border border-emerald-300">
+                  👑 Toàn quyền GVCN — Không có vùng cấm
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5">
+                GVCN có toàn quyền thay đổi tất cả nội dung: họ tên, chức danh, email và mã PIN của mọi tài khoản không bị hạn chế.
               </p>
             </div>
           </div>
-          <span className="text-xs px-2.5 py-1 bg-emerald-50 text-emerald-800 font-bold rounded-lg border border-emerald-200 self-start sm:self-auto">
+          <span className="text-xs px-3 py-1 bg-blue-50 text-blue-800 font-bold rounded-lg border border-blue-200 self-start sm:self-auto">
             {officerAccounts.length} Tài khoản Cán bộ
           </span>
         </div>
 
         {/* Existing Accounts List */}
-        <div className="space-y-2.5">
+        <div className="space-y-3">
           {officerAccounts.map((acc) => {
             const isEditing = editingAccId === acc.id;
             return (
               <div
                 key={acc.id}
-                className="p-3.5 bg-slate-50/80 rounded-xl border border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs"
+                className="p-4 bg-slate-50 rounded-2xl border border-slate-200 flex flex-col gap-3 text-xs"
               >
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-blue-100 text-blue-800 flex items-center justify-center font-bold text-xs shrink-0">
-                    {acc.role === 'gvcn' ? 'GV' : acc.role === 'lop_truong' ? 'LT' : 'LP'}
-                  </div>
-                  <div>
-                    <div className="font-bold text-slate-900 flex items-center gap-2">
-                      <span>{acc.name}</span>
-                      <span className="text-[10px] px-2 py-0.5 bg-blue-600 text-white rounded font-bold">
-                        {acc.title}
-                      </span>
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center font-black text-sm shrink-0 shadow-xs">
+                      {acc.role === 'gvcn' ? 'GV' : acc.role === 'lop_truong' ? 'LT' : 'LP'}
                     </div>
-                    {isEditing ? (
-                      <div className="flex flex-wrap items-center gap-2 mt-2">
-                        <input
-                          type="email"
-                          value={editEmail}
-                          onChange={(e) => setEditEmail(e.target.value)}
-                          placeholder="Gmail..."
-                          className="px-2.5 py-1 border rounded-lg bg-white border-slate-300 text-xs font-mono w-56"
-                        />
-                        <input
-                          type="text"
-                          value={editPin}
-                          onChange={(e) => setEditPin(e.target.value)}
-                          placeholder="PIN..."
-                          className="px-2.5 py-1 border rounded-lg bg-white border-slate-300 text-xs font-mono w-24"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => handleSaveEditAcc(acc.id)}
-                          className="px-3 py-1 bg-blue-600 text-white rounded-lg font-bold text-[11px] hover:bg-blue-500"
-                        >
-                          Lưu
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setEditingAccId(null)}
-                          className="px-2 py-1 text-slate-500 hover:text-slate-700 text-[11px]"
-                        >
-                          Hủy
-                        </button>
+                    <div>
+                      <div className="font-black text-slate-900 text-sm flex items-center gap-2">
+                        <span>{acc.name}</span>
+                        <span className="text-[10px] px-2 py-0.5 bg-blue-100 text-blue-900 rounded-md font-bold border border-blue-200">
+                          {acc.title}
+                        </span>
+                        {acc.role === 'gvcn' && (
+                          <span className="text-[10px] px-1.5 py-0.5 bg-emerald-600 text-white rounded font-bold">
+                            Chủ nhiệm
+                          </span>
+                        )}
                       </div>
-                    ) : (
-                      <div className="text-[11px] text-slate-600 mt-0.5 flex flex-wrap items-center gap-3">
-                        <span className="font-mono text-blue-700 font-semibold">{acc.email}</span>
+                      <div className="text-xs text-slate-600 mt-1 flex flex-wrap items-center gap-3 font-mono">
+                        <span className="text-blue-700 font-semibold">{acc.email}</span>
                         <span className="text-slate-400">·</span>
-                        <span className="font-mono text-slate-500">
-                          Mã PIN: <code>{acc.pin}</code>
+                        <span className="text-slate-700 bg-white px-2 py-0.5 rounded border border-slate-200">
+                          Mã PIN: <strong>{acc.pin}</strong>
                         </span>
                       </div>
-                    )}
+                    </div>
                   </div>
-                </div>
 
-                {!isEditing && (
-                  <div className="flex items-center gap-2 self-end md:self-auto">
-                    <button
-                      type="button"
-                      onClick={() => handleStartEditAcc(acc)}
-                      className="px-2.5 py-1 text-slate-600 hover:text-blue-700 bg-white hover:bg-blue-50 border border-slate-200 rounded-lg text-[11px] font-semibold transition"
-                    >
-                      Đổi Gmail / PIN
-                    </button>
-                    {acc.role !== 'gvcn' && (
+                  {!isEditing && (
+                    <div className="flex items-center gap-2 self-end md:self-auto shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => handleStartEditAcc(acc)}
+                        className="px-3 py-1.5 text-blue-700 hover:text-white bg-blue-50 hover:bg-blue-600 border border-blue-200 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                        <span>Sửa toàn quyền</span>
+                      </button>
                       <button
                         type="button"
                         onClick={() => handleDeleteAcc(acc)}
-                        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"
-                        title="Xóa quyền cán sự"
+                        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition cursor-pointer"
+                        title="Xóa tài khoản này"
                       >
-                        <Trash2 className="w-3.5 h-3.5" />
+                        <Trash2 className="w-4 h-4" />
                       </button>
-                    )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Inline Full Edit Form for Any Officer including GVCN */}
+                {isEditing && (
+                  <div className="p-3.5 bg-white rounded-xl border border-blue-300 shadow-xs space-y-3 mt-2">
+                    <div className="font-bold text-slate-800 text-xs flex items-center gap-1.5 text-blue-900">
+                      <Edit3 className="w-3.5 h-3.5 text-blue-600" />
+                      <span>Chỉnh sửa toàn quyền nội dung cho cán bộ [{acc.name}]:</span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 mb-0.5">Họ và tên:</label>
+                        <input
+                          type="text"
+                          required
+                          value={editName}
+                          onChange={(e) => setEditName(e.target.value)}
+                          placeholder="Họ và tên..."
+                          className="w-full p-2 border rounded-lg bg-white border-slate-300 text-xs font-bold"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 mb-0.5">Chức danh:</label>
+                        <input
+                          type="text"
+                          required
+                          value={editTitle}
+                          onChange={(e) => setEditTitle(e.target.value)}
+                          placeholder="Chức danh..."
+                          className="w-full p-2 border rounded-lg bg-white border-slate-300 text-xs"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 mb-0.5">Vai trò hệ thống:</label>
+                        <select
+                          value={editRole}
+                          onChange={(e) => setEditRole(e.target.value as any)}
+                          className="w-full p-2 border rounded-lg bg-white border-slate-300 text-xs font-semibold"
+                        >
+                          <option value="gvcn">GVCN (Toàn quyền)</option>
+                          <option value="lop_truong">Lớp trưởng (Ban Cán Sự)</option>
+                          <option value="lop_pho">Lớp phó (Ban Cán Sự)</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 mb-0.5">Địa chỉ Gmail:</label>
+                        <input
+                          type="email"
+                          required
+                          value={editEmail}
+                          onChange={(e) => setEditEmail(e.target.value)}
+                          placeholder="Email Gmail..."
+                          className="w-full p-2 border rounded-lg bg-white border-slate-300 text-xs font-mono"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 mb-0.5">Mã PIN bí mật:</label>
+                        <input
+                          type="text"
+                          required
+                          value={editPin}
+                          onChange={(e) => setEditPin(e.target.value)}
+                          placeholder="Mã PIN..."
+                          className="w-full p-2 border rounded-lg bg-white border-slate-300 text-xs font-mono font-bold"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-end gap-2 pt-1 border-t border-slate-100">
+                      <button
+                        type="button"
+                        onClick={() => setEditingAccId(null)}
+                        className="px-3 py-1.5 text-slate-600 hover:bg-slate-100 rounded-lg text-xs font-semibold cursor-pointer"
+                      >
+                        Hủy
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleSaveEditAcc(acc.id)}
+                        className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-bold text-xs shadow-xs transition active:scale-95 cursor-pointer flex items-center gap-1"
+                      >
+                        <Check className="w-3.5 h-3.5" />
+                        <span>Lưu thay đổi</span>
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -512,10 +590,10 @@ export const SettingsPage: React.FC = () => {
         </div>
 
         {/* Add New Authorized Account Form */}
-        <form onSubmit={handleAddOfficer} className="p-3.5 bg-blue-50/50 rounded-xl border border-blue-200 text-xs space-y-2.5">
-          <div className="font-bold text-blue-950 flex items-center gap-1.5">
+        <form onSubmit={handleAddOfficer} className="p-4 bg-blue-50/50 rounded-2xl border border-blue-200 text-xs space-y-3">
+          <div className="font-bold text-blue-950 flex items-center gap-1.5 text-sm">
             <Plus className="w-4 h-4 text-blue-700" />
-            <span>Thêm tài khoản Gmail cán bộ được cấp quyền:</span>
+            <span>Thêm tài khoản cán bộ mới (GVCN toàn quyền cấp phép):</span>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">

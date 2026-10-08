@@ -105,76 +105,41 @@ export const Navbar: React.FC<Props> = ({
             )}
           </div>
 
-          {/* Active Role & Login / Logout Controls */}
-          <div className="flex items-center gap-2 shrink-0">
+          {/* Active Role & Controls - Chữ to rõ ràng, không lộ email cá nhân */}
+          <div className="flex items-center gap-2.5 shrink-0">
             {/* If currently Student (View-only) */}
             {!isOfficer ? (
               <>
-                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800/90 rounded-xl border border-slate-700 text-xs text-slate-300">
-                  <Lock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                  {currentUser.email ? (
-                    <>
-                      <span className="truncate max-w-[110px] sm:max-w-[180px] text-amber-300 font-mono text-[11px] font-bold">
-                        {currentUser.email}
-                      </span>
-                      <span className="text-[10px] font-extrabold text-rose-300 bg-rose-950/80 px-1.5 py-0.5 rounded border border-rose-800">
-                        Bị hạn chế
-                      </span>
-                    </>
-                  ) : (
-                    <>
-                      <span>Học sinh</span>
-                      <span className="text-amber-400 font-bold">(Chỉ xem)</span>
-                    </>
-                  )}
+                <div className="flex items-center gap-2 px-3.5 py-2 bg-slate-800/90 rounded-xl border border-slate-700 text-sm text-slate-300">
+                  <Lock className="w-4 h-4 text-amber-400 shrink-0" />
+                  <span>Chế độ Học sinh</span>
+                  <span className="text-amber-400 font-bold">(Chỉ xem)</span>
                 </div>
-
-                {currentUser.email && (
-                  <button
-                    type="button"
-                    onClick={() => appState.logoutToStudentMode()}
-                    className="min-h-[38px] px-2 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 font-medium text-xs rounded-xl transition flex items-center gap-1 cursor-pointer"
-                    title="Đăng xuất tài khoản học sinh này"
-                  >
-                    <LogOut className="w-3.5 h-3.5 text-slate-400" />
-                    <span className="hidden sm:inline">Thoát</span>
-                  </button>
-                )}
 
                 <button
                   type="button"
                   onClick={onOpenAuthModal}
-                  className="min-h-[38px] px-3.5 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer active:scale-95"
+                  className="min-h-[42px] px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-sm rounded-xl shadow-xs transition flex items-center gap-2 cursor-pointer active:scale-95"
                 >
-                  <ShieldCheck className="w-4 h-4 text-slate-950" />
-                  <span>Đăng nhập Cán sự / GVCN</span>
+                  <ShieldCheck className="w-4.5 h-4.5 text-slate-950" />
+                  <span>Kích hoạt quyền GVCN</span>
                 </button>
               </>
             ) : (
               /* If currently Authenticated Officer */
-              <div className="flex items-center gap-2">
-                <div className="px-3 py-1.5 bg-emerald-950/80 border border-emerald-500/50 rounded-xl text-xs font-bold text-emerald-300 flex items-center gap-1.5 shadow-xs">
-                  <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
-                  <span className="truncate max-w-[140px] sm:max-w-none">{currentUser.name}</span>
+              <div className="flex items-center gap-2.5">
+                <div className="px-3.5 py-2 bg-emerald-950/90 border border-emerald-500/60 rounded-xl text-sm font-black text-emerald-300 flex items-center gap-2 shadow-xs">
+                  <ShieldCheck className="w-4.5 h-4.5 text-emerald-400 shrink-0" />
+                  <span className="truncate max-w-[200px] sm:max-w-none">{currentUser.name}</span>
                 </div>
 
                 <button
                   type="button"
                   onClick={onOpenAuthModal}
-                  className="min-h-[38px] px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-bold text-xs rounded-xl transition flex items-center gap-1 cursor-pointer"
-                  title="Chuyển đổi tài khoản hoặc mã PIN"
+                  className="min-h-[42px] px-3.5 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-bold text-sm rounded-xl transition flex items-center gap-1.5 cursor-pointer"
+                  title="Chuyển đổi tài khoản hoặc vai trò"
                 >
                   <span>Đổi vai trò</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => appState.logoutToStudentMode()}
-                  className="min-h-[38px] px-2.5 py-1.5 bg-rose-950/60 hover:bg-rose-900/80 text-rose-300 border border-rose-700/60 font-bold text-xs rounded-xl transition flex items-center gap-1 cursor-pointer"
-                  title="Đăng xuất (Khóa về chế độ Học sinh chỉ xem)"
-                >
-                  <LogOut className="w-3.5 h-3.5 text-rose-300" />
-                  <span className="hidden sm:inline">Khóa lại</span>
                 </button>
               </div>
             )}

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { appState } from '../services/appStateService';
 import { StatusBadge } from '../components/StatusBadge';
 import {
@@ -14,11 +14,12 @@ import {
   FileSpreadsheet,
   ArrowRight,
   Info,
-  Mail,
-  Phone,
   Edit3,
   Sparkles,
   School,
+  Check,
+  X,
+  UserCheck,
 } from 'lucide-react';
 import { NavTab } from '../components/Sidebar';
 
@@ -37,6 +38,12 @@ export const DashboardPage: React.FC<Props> = ({
   onOpenExcelImport,
   onOpenAuthModal,
 }) => {
+  // Lắng nghe thay đổi tức thời từ appState để trang luôn cập nhật trực tiếp
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    return appState.subscribe(() => setTick((t) => t + 1));
+  }, []);
+
   const students = appState.students;
   const groups = appState.groups;
   const incidents = appState.incidents;
@@ -48,6 +55,67 @@ export const DashboardPage: React.FC<Props> = ({
     currentUser.role === 'gvcn' ||
     currentUser.role === 'lop_truong' ||
     currentUser.role === 'lop_pho';
+
+  // State: Modal Chỉnh sửa nhanh Ban Cán Sự ngay tại Dashboard
+  const [isEditingOfficersModal, setIsEditingOfficersModal] = useState(false);
+  const [isCustomPresident, setIsCustomPresident] = useState(false);
+  const [isCustomViceDiscipline, setIsCustomViceDiscipline] = useState(false);
+  const [isCustomViceAcademic, setIsCustomViceAcademic] = useState(false);
+  const [isCustomSecretary, setIsCustomSecretary] = useState(false);
+
+  const [officerForm, setOfficerForm] = useState({
+    gvcn_name: classInfo.gvcn_name,
+    class_president_name: classInfo.class_president_name,
+    class_vice_discipline_name: classInfo.class_vice_discipline_name,
+    class_vice_academic_name: classInfo.class_vice_academic_name,
+    secretary_name: classInfo.secretary_name,
+    group1_leader: groups.find((g) => g.group_number === 1)?.leader_student_id || '',
+    group2_leader: groups.find((g) => g.group_number === 2)?.leader_student_id || '',
+    group3_leader: groups.find((g) => g.group_number === 3)?.leader_student_id || '',
+    group4_leader: groups.find((g) => g.group_number === 4)?.leader_student_id || '',
+  });
+
+  const handleOpenEditOfficers = () => {
+    setOfficerForm({
+      gvcn_name: classInfo.gvcn_name,
+      class_president_name: classInfo.class_president_name,
+      class_vice_discipline_name: classInfo.class_vice_discipline_name,
+      class_vice_academic_name: classInfo.class_vice_academic_name,
+      secretary_name: classInfo.secretary_name,
+      group1_leader: groups.find((g) => g.group_number === 1)?.leader_student_id || '',
+      group2_leader: groups.find((g) => g.group_number === 2)?.leader_student_id || '',
+      group3_leader: groups.find((g) => g.group_number === 3)?.leader_student_id || '',
+      group4_leader: groups.find((g) => g.group_number === 4)?.leader_student_id || '',
+    });
+    setIsEditingOfficersModal(true);
+  };
+
+  const handleSaveOfficers = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    await appState.updateClassInfo({
+      gvcn_name: officerForm.gvcn_name.trim(),
+      class_president_name: officerForm.class_president_name.trim(),
+      class_vice_discipline_name: officerForm.class_vice_discipline_name.trim(),
+      class_vice_academic_name: officerForm.class_vice_academic_name.trim(),
+      secretary_name: officerForm.secretary_name.trim(),
+    });
+
+    const g1 = groups.find((g) => g.group_number === 1);
+    if (g1) await appState.updateGroupLeader(g1.id, officerForm.group1_leader);
+
+    const g2 = groups.find((g) => g.group_number === 2);
+    if (g2) await appState.updateGroupLeader(g2.id, officerForm.group2_leader);
+
+    const g3 = groups.find((g) => g.group_number === 3);
+    if (g3) await appState.updateGroupLeader(g3.id, officerForm.group3_leader);
+
+    const g4 = groups.find((g) => g.group_number === 4);
+    if (g4) await appState.updateGroupLeader(g4.id, officerForm.group4_leader);
+
+    appState.showToast('Đã lưu và cập nhật Ban Cán Sự Lớp học thành công!', 'success');
+    setIsEditingOfficersModal(false);
+  };
 
   const pendingIncidentsCount = incidents.filter((i) => i.incident_status === 'pending_verification').length;
   const pendingRewardsCount = rewards.filter((r) => r.status === 'pending').length;
@@ -211,192 +279,457 @@ export const DashboardPage: React.FC<Props> = ({
         </div>
       </div>
 
-      {/* BAN CÁN SỰ & ĐIỀU HÀNH LỚP 10A16 (CÔNG KHAI) */}
-      <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
-          <div className="flex items-center gap-2.5">
-            <div className="p-2 bg-blue-50 text-blue-700 rounded-xl">
-              <ShieldCheck className="w-5 h-5" />
+      {/* BAN CÁN SỰ & ĐIỀU HÀNH LỚP 10A16 (CHỮ TO RÕ RÀNG, BẢO MẬT TUYỆT ĐỐI) */}
+      <div className="bg-white p-6 sm:p-7 rounded-3xl border border-slate-200 shadow-sm space-y-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-blue-50 text-blue-700 rounded-2xl">
+              <ShieldCheck className="w-6 h-6" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <h3 className="font-black text-sm sm:text-base text-slate-900 tracking-tight">
+              <div className="flex flex-wrap items-center gap-2.5">
+                <h3 className="font-black text-lg sm:text-xl text-slate-900 tracking-tight">
                   Ban Cán Sự & Nhân Sự Điều Hành {classInfo.class_name}
                 </h3>
-                <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-blue-100 text-blue-800">
-                  Chính thức {classInfo.academic_year}
+                <span className="text-xs font-black px-3 py-1 rounded-full bg-blue-100 text-blue-800">
+                  Năm học {classInfo.academic_year}
                 </span>
               </div>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Cập nhật đồng bộ tức thời từ GVCN • Công khai cho toàn thể học sinh và phụ huynh
+              <p className="text-sm text-slate-500 mt-1">
+                Công khai minh bạch toàn diện • GVCN toàn quyền chỉ định & thay đổi mọi nội dung không hạn chế
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5 shrink-0">
+            {canManageClass && (
+              <button
+                type="button"
+                onClick={handleOpenEditOfficers}
+                className="px-4 py-2.5 text-sm font-black bg-blue-600 hover:bg-blue-500 text-white rounded-xl shadow-md shadow-blue-600/20 transition active:scale-95 cursor-pointer flex items-center gap-2"
+              >
+                <Edit3 className="w-4 h-4" />
+                <span>Chỉnh sửa Ban Cán Sự</span>
+              </button>
+            )}
             <button
               onClick={() => onNavigate('class_info')}
-              className="px-3.5 py-1.5 text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white rounded-xl shadow-xs transition active:scale-95 cursor-pointer flex items-center gap-1.5"
+              className="px-4 py-2.5 text-sm font-bold bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl transition cursor-pointer flex items-center gap-2"
             >
-              <Edit3 className="w-3.5 h-3.5" />
-              <span>{canManageClass ? 'Quản lý & Điều chỉnh' : 'Xem chi tiết lớp'}</span>
+              <span>Hồ sơ lớp</span>
+              <ArrowRight className="w-4 h-4" />
             </button>
           </div>
         </div>
 
-        {/* Officers Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        {/* Officers Grid - Chữ to, cao, rõ nét */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {/* GVCN */}
-          <div className="p-3.5 bg-gradient-to-br from-blue-50 to-indigo-50/40 rounded-xl border border-blue-200 flex flex-col justify-between">
+          <div className="p-5 bg-gradient-to-br from-blue-50/90 to-indigo-50/50 rounded-2xl border-2 border-blue-200 flex flex-col justify-between shadow-xs">
             <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="text-[10px] font-extrabold uppercase tracking-wider text-blue-700">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-black uppercase tracking-wider text-blue-700">
                   Giáo viên Chủ nhiệm (GVCN)
                 </span>
-                <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-blue-600 text-white shadow-xs">
+                <span className="text-xs font-black px-2.5 py-0.5 rounded-lg bg-blue-600 text-white shadow-xs">
                   Toàn quyền
                 </span>
               </div>
-              <div className="font-black text-slate-900 text-sm sm:text-base">{classInfo.gvcn_name}</div>
-              <div className="text-xs text-slate-600 mt-1 space-y-1">
-                <div className="flex items-center gap-1.5 text-slate-700">
-                  <School className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+              <div className="font-black text-slate-900 text-lg sm:text-xl tracking-tight">
+                {classInfo.gvcn_name}
+              </div>
+              <div className="text-sm text-slate-600 mt-2 space-y-1">
+                <div className="flex items-center gap-2 text-slate-700 font-semibold">
+                  <School className="w-4 h-4 text-blue-600 shrink-0" />
                   <span>{classInfo.room_number} · THPT Võ Trường Toản</span>
                 </div>
-                {canManageClass && classInfo.gvcn_email && (
-                  <div className="flex items-center gap-1.5 font-mono text-[11px] text-blue-800 truncate">
-                    <Mail className="w-3 h-3 text-blue-600 shrink-0" />
-                    <span className="truncate">{classInfo.gvcn_email}</span>
-                  </div>
-                )}
               </div>
             </div>
-            <div className="text-xs text-blue-800 font-semibold mt-2 pt-2 border-t border-blue-200/60">
+            <div className="text-xs sm:text-sm text-blue-900 font-bold mt-3 pt-2.5 border-t border-blue-200/80">
               Chỉ đạo toàn diện nề nếp & giáo dục
             </div>
           </div>
 
           {/* Lớp trưởng */}
-          <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 flex flex-col justify-between">
+          <div className="p-5 bg-slate-50/90 rounded-2xl border-2 border-slate-200 flex flex-col justify-between shadow-xs">
             <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-600">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-black uppercase tracking-wider text-slate-600">
                   Lớp trưởng
                 </span>
-                <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800">
+                <span className="text-xs font-black px-2.5 py-0.5 rounded-lg bg-emerald-100 text-emerald-800">
                   Ban Cán Sự
                 </span>
               </div>
-              <div className="font-black text-slate-900 text-sm sm:text-base">
+              <div className="font-black text-slate-900 text-lg sm:text-xl tracking-tight">
                 {classInfo.class_president_name}
               </div>
-              <p className="text-[11px] text-slate-500 mt-1">
+              <p className="text-sm text-slate-600 mt-2 leading-relaxed">
                 Điều hành chung mọi hoạt động lớp, tổng hợp báo cáo GVCN
               </p>
             </div>
-            <div className="text-[10px] text-slate-400 font-medium mt-2 pt-2 border-t border-slate-200">
+            <div className="text-xs sm:text-sm text-slate-500 font-semibold mt-3 pt-2.5 border-t border-slate-200">
               Quyền hạn: Phê duyệt sự việc & chấm nề nếp
             </div>
           </div>
 
           {/* Lớp phó Kỷ luật */}
-          <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 flex flex-col justify-between">
+          <div className="p-5 bg-slate-50/90 rounded-2xl border-2 border-slate-200 flex flex-col justify-between shadow-xs">
             <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="text-[10px] font-extrabold uppercase tracking-wider text-rose-600">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-black uppercase tracking-wider text-rose-700">
                   Lớp phó Kỷ luật & Nề nếp
                 </span>
-                <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800">
+                <span className="text-xs font-black px-2.5 py-0.5 rounded-lg bg-emerald-100 text-emerald-800">
                   Ban Cán Sự
                 </span>
               </div>
-              <div className="font-black text-slate-900 text-sm sm:text-base">
+              <div className="font-black text-slate-900 text-lg sm:text-xl tracking-tight">
                 {classInfo.class_vice_discipline_name}
               </div>
-              <p className="text-[11px] text-slate-500 mt-1">
-                Theo dõi điểm danh, ghi nhận vi phạm QĐ 525, tính điểm tuần
+              <p className="text-sm text-slate-600 mt-2 leading-relaxed">
+                Theo dõi điểm danh, ghi nhận vi phạm nội quy, tính điểm tuần
               </p>
             </div>
-            <div className="text-[10px] text-rose-500 font-medium mt-2 pt-2 border-t border-slate-200">
+            <div className="text-xs sm:text-sm text-rose-600 font-semibold mt-3 pt-2.5 border-t border-slate-200">
               Quyền hạn: Thẩm tra vi phạm & chốt hiệu lực
             </div>
           </div>
 
           {/* Lớp phó Học tập */}
-          <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 flex flex-col justify-between">
+          <div className="p-5 bg-slate-50/90 rounded-2xl border-2 border-slate-200 flex flex-col justify-between shadow-xs">
             <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="text-[10px] font-extrabold uppercase tracking-wider text-indigo-600">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-black uppercase tracking-wider text-indigo-700">
                   Lớp phó Học tập
                 </span>
-                <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700">
+                <span className="text-xs font-black px-2.5 py-0.5 rounded-lg bg-indigo-50 text-indigo-800">
                   Học vụ
                 </span>
               </div>
-              <div className="font-black text-slate-900 text-sm sm:text-base">
+              <div className="font-black text-slate-900 text-lg sm:text-xl tracking-tight">
                 {classInfo.class_vice_academic_name}
               </div>
-              <p className="text-[11px] text-slate-500 mt-1">
+              <p className="text-sm text-slate-600 mt-2 leading-relaxed">
                 Quản lý sổ đầu bài, đôn đốc bài vở 15 phút đầu giờ
               </p>
             </div>
-            <div className="text-[10px] text-indigo-500 font-medium mt-2 pt-2 border-t border-slate-200">
+            <div className="text-xs sm:text-sm text-indigo-600 font-semibold mt-3 pt-2.5 border-t border-slate-200">
               Đôn đốc chuẩn bị bài trước tiết học
             </div>
           </div>
 
           {/* Bí thư */}
-          <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 flex flex-col justify-between">
+          <div className="p-5 bg-slate-50/90 rounded-2xl border-2 border-slate-200 flex flex-col justify-between shadow-xs">
             <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="text-[10px] font-extrabold uppercase tracking-wider text-amber-700">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-black uppercase tracking-wider text-amber-800">
                   Bí thư Chi đoàn
                 </span>
-                <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-amber-50 text-amber-800">
+                <span className="text-xs font-black px-2.5 py-0.5 rounded-lg bg-amber-50 text-amber-800">
                   Đoàn TN
                 </span>
               </div>
-              <div className="font-black text-slate-900 text-sm sm:text-base">
+              <div className="font-black text-slate-900 text-lg sm:text-xl tracking-tight">
                 {classInfo.secretary_name}
               </div>
-              <p className="text-[11px] text-slate-500 mt-1">
-                Phong trào Đoàn TNCS, hoạt động tình nguyện & báo tường
+              <p className="text-sm text-slate-600 mt-2 leading-relaxed">
+                Phong trào Đoàn TNCS, hoạt động tình nguyện & phong trào thi đua
               </p>
             </div>
-            <div className="text-[10px] text-amber-600 font-medium mt-2 pt-2 border-t border-slate-200">
+            <div className="text-xs sm:text-sm text-amber-700 font-semibold mt-3 pt-2.5 border-t border-slate-200">
               Triển khai các phong trào thi đua
             </div>
           </div>
 
           {/* 4 Tổ trưởng */}
-          <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 flex flex-col justify-between">
+          <div className="p-5 bg-slate-50/90 rounded-2xl border-2 border-slate-200 flex flex-col justify-between shadow-xs">
             <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-600">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-black uppercase tracking-wider text-slate-700">
                   4 Tổ trưởng Tự quản
                 </span>
-                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-slate-200 text-slate-700">
+                <span className="text-xs font-black px-2 py-0.5 rounded-lg bg-slate-200 text-slate-800">
                   Tổ 1–4
                 </span>
               </div>
-              <div className="space-y-1 text-xs mt-1">
+              <div className="space-y-2 mt-2">
                 {groups.map((g) => {
                   const leader = students.find((s) => s.id === g.leader_student_id);
                   return (
-                    <div key={g.id} className="flex items-center justify-between py-0.5 border-b border-slate-200/60 last:border-0">
-                      <span className="font-semibold text-slate-600">Tổ {g.group_number}:</span>
-                      <span className="font-bold text-slate-900">{leader ? leader.full_name : 'Chưa gán'}</span>
+                    <div key={g.id} className="flex items-center justify-between py-1 border-b border-slate-200/60 last:border-0 text-sm">
+                      <span className="font-bold text-slate-600">Tổ {g.group_number}:</span>
+                      <span className="font-black text-slate-900">
+                        {leader ? leader.full_name : g.leader_student_id || 'Chưa gán'}
+                      </span>
                     </div>
                   );
                 })}
               </div>
             </div>
-            <div className="text-[10px] text-slate-400 font-medium mt-1 pt-1.5 border-t border-slate-200">
+            <div className="text-xs sm:text-sm text-slate-500 font-semibold mt-2 pt-2 border-t border-slate-200">
               Chấm chéo nề nếp tổ sinh hoạt hàng ngày
             </div>
           </div>
         </div>
       </div>
+
+      {/* Modal Chỉnh sửa Ban Cán Sự trực tiếp ngay trên Dashboard */}
+      {isEditingOfficersModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full overflow-hidden border border-slate-200 animate-in fade-in duration-200">
+            <div className="px-6 py-5 bg-gradient-to-r from-slate-900 to-blue-950 text-white flex items-center justify-between">
+              <div>
+                <h3 className="font-black text-lg">Chỉ định Ban Cán Sự & Tổ Trưởng</h3>
+                <p className="text-xs text-slate-300 mt-0.5">GVCN có toàn quyền thay đổi mọi chức danh không hạn chế</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsEditingOfficersModal(false)}
+                className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveOfficers} className="p-6 space-y-4 max-h-[75vh] overflow-y-auto text-sm">
+              <div>
+                <label className="block font-bold text-slate-800 mb-1">1. Họ và tên GVCN:</label>
+                <input
+                  type="text"
+                  required
+                  value={officerForm.gvcn_name}
+                  onChange={(e) => setOfficerForm({ ...officerForm, gvcn_name: e.target.value })}
+                  className="w-full p-3 border-2 rounded-xl border-slate-300 font-black text-base text-slate-900 focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+                />
+              </div>
+
+              {/* Lớp trưởng */}
+              <div className="space-y-1.5 pt-2 border-t border-slate-100">
+                <div className="flex items-center justify-between">
+                  <label className="font-bold text-slate-800">2. Lớp trưởng:</label>
+                  <button
+                    type="button"
+                    onClick={() => setIsCustomPresident(!isCustomPresident)}
+                    className="text-xs font-bold text-blue-600 hover:underline cursor-pointer"
+                  >
+                    {isCustomPresident ? '↩ Chọn danh sách' : '✏️ Tự gõ họ tên'}
+                  </button>
+                </div>
+                {isCustomPresident ? (
+                  <input
+                    type="text"
+                    required
+                    value={officerForm.class_president_name}
+                    onChange={(e) => setOfficerForm({ ...officerForm, class_president_name: e.target.value })}
+                    placeholder="Nhập họ tên Lớp trưởng..."
+                    className="w-full p-3 border-2 rounded-xl border-blue-400 bg-blue-50/30 font-bold text-slate-900"
+                  />
+                ) : (
+                  <select
+                    value={officerForm.class_president_name}
+                    onChange={(e) => setOfficerForm({ ...officerForm, class_president_name: e.target.value })}
+                    className="w-full p-3 border-2 rounded-xl border-slate-300 bg-white font-bold text-slate-900"
+                  >
+                    {students.map((s) => (
+                      <option key={s.id} value={s.full_name}>
+                        {s.student_code} - {s.full_name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+
+              {/* Lớp phó Kỷ luật */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="font-bold text-slate-800">3. Lớp phó Kỷ luật & Nề nếp:</label>
+                  <button
+                    type="button"
+                    onClick={() => setIsCustomViceDiscipline(!isCustomViceDiscipline)}
+                    className="text-xs font-bold text-blue-600 hover:underline cursor-pointer"
+                  >
+                    {isCustomViceDiscipline ? '↩ Chọn danh sách' : '✏️ Tự gõ họ tên'}
+                  </button>
+                </div>
+                {isCustomViceDiscipline ? (
+                  <input
+                    type="text"
+                    required
+                    value={officerForm.class_vice_discipline_name}
+                    onChange={(e) => setOfficerForm({ ...officerForm, class_vice_discipline_name: e.target.value })}
+                    placeholder="Nhập họ tên Lớp phó Kỷ luật..."
+                    className="w-full p-3 border-2 rounded-xl border-rose-400 bg-rose-50/30 font-bold text-slate-900"
+                  />
+                ) : (
+                  <select
+                    value={officerForm.class_vice_discipline_name}
+                    onChange={(e) => setOfficerForm({ ...officerForm, class_vice_discipline_name: e.target.value })}
+                    className="w-full p-3 border-2 rounded-xl border-slate-300 bg-white font-bold text-slate-900"
+                  >
+                    {students.map((s) => (
+                      <option key={s.id} value={s.full_name}>
+                        {s.student_code} - {s.full_name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+
+              {/* Lớp phó Học tập */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="font-bold text-slate-800">4. Lớp phó Học tập:</label>
+                  <button
+                    type="button"
+                    onClick={() => setIsCustomViceAcademic(!isCustomViceAcademic)}
+                    className="text-xs font-bold text-blue-600 hover:underline cursor-pointer"
+                  >
+                    {isCustomViceAcademic ? '↩ Chọn danh sách' : '✏️ Tự gõ họ tên'}
+                  </button>
+                </div>
+                {isCustomViceAcademic ? (
+                  <input
+                    type="text"
+                    required
+                    value={officerForm.class_vice_academic_name}
+                    onChange={(e) => setOfficerForm({ ...officerForm, class_vice_academic_name: e.target.value })}
+                    placeholder="Nhập họ tên Lớp phó Học tập..."
+                    className="w-full p-3 border-2 rounded-xl border-indigo-400 bg-indigo-50/30 font-bold text-slate-900"
+                  />
+                ) : (
+                  <select
+                    value={officerForm.class_vice_academic_name}
+                    onChange={(e) => setOfficerForm({ ...officerForm, class_vice_academic_name: e.target.value })}
+                    className="w-full p-3 border-2 rounded-xl border-slate-300 bg-white font-bold text-slate-900"
+                  >
+                    {students.map((s) => (
+                      <option key={s.id} value={s.full_name}>
+                        {s.student_code} - {s.full_name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+
+              {/* Bí thư */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="font-bold text-slate-800">5. Bí thư Chi đoàn:</label>
+                  <button
+                    type="button"
+                    onClick={() => setIsCustomSecretary(!isCustomSecretary)}
+                    className="text-xs font-bold text-blue-600 hover:underline cursor-pointer"
+                  >
+                    {isCustomSecretary ? '↩ Chọn danh sách' : '✏️ Tự gõ họ tên'}
+                  </button>
+                </div>
+                {isCustomSecretary ? (
+                  <input
+                    type="text"
+                    required
+                    value={officerForm.secretary_name}
+                    onChange={(e) => setOfficerForm({ ...officerForm, secretary_name: e.target.value })}
+                    placeholder="Nhập họ tên Bí thư..."
+                    className="w-full p-3 border-2 rounded-xl border-amber-400 bg-amber-50/30 font-bold text-slate-900"
+                  />
+                ) : (
+                  <select
+                    value={officerForm.secretary_name}
+                    onChange={(e) => setOfficerForm({ ...officerForm, secretary_name: e.target.value })}
+                    className="w-full p-3 border-2 rounded-xl border-slate-300 bg-white font-bold text-slate-900"
+                  >
+                    {students.map((s) => (
+                      <option key={s.id} value={s.full_name}>
+                        {s.student_code} - {s.full_name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+
+              {/* 4 Tổ trưởng */}
+              <div className="pt-2 border-t border-slate-100 space-y-2">
+                <label className="block font-bold text-slate-800">6. Chỉ định 4 Tổ trưởng:</label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <span className="block text-xs font-semibold text-slate-600 mb-1">Tổ trưởng Tổ 1:</span>
+                    <select
+                      value={officerForm.group1_leader}
+                      onChange={(e) => setOfficerForm({ ...officerForm, group1_leader: e.target.value })}
+                      className="w-full p-2.5 border-2 rounded-xl border-slate-300 bg-white font-semibold text-xs"
+                    >
+                      <option value="">-- Chưa gán --</option>
+                      {students.map((s) => (
+                        <option key={s.id} value={s.id}>{s.student_code} - {s.full_name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <span className="block text-xs font-semibold text-slate-600 mb-1">Tổ trưởng Tổ 2:</span>
+                    <select
+                      value={officerForm.group2_leader}
+                      onChange={(e) => setOfficerForm({ ...officerForm, group2_leader: e.target.value })}
+                      className="w-full p-2.5 border-2 rounded-xl border-slate-300 bg-white font-semibold text-xs"
+                    >
+                      <option value="">-- Chưa gán --</option>
+                      {students.map((s) => (
+                        <option key={s.id} value={s.id}>{s.student_code} - {s.full_name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <span className="block text-xs font-semibold text-slate-600 mb-1">Tổ trưởng Tổ 3:</span>
+                    <select
+                      value={officerForm.group3_leader}
+                      onChange={(e) => setOfficerForm({ ...officerForm, group3_leader: e.target.value })}
+                      className="w-full p-2.5 border-2 rounded-xl border-slate-300 bg-white font-semibold text-xs"
+                    >
+                      <option value="">-- Chưa gán --</option>
+                      {students.map((s) => (
+                        <option key={s.id} value={s.id}>{s.student_code} - {s.full_name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <span className="block text-xs font-semibold text-slate-600 mb-1">Tổ trưởng Tổ 4:</span>
+                    <select
+                      value={officerForm.group4_leader}
+                      onChange={(e) => setOfficerForm({ ...officerForm, group4_leader: e.target.value })}
+                      className="w-full p-2.5 border-2 rounded-xl border-slate-300 bg-white font-semibold text-xs"
+                    >
+                      <option value="">-- Chưa gán --</option>
+                      {students.map((s) => (
+                        <option key={s.id} value={s.id}>{s.student_code} - {s.full_name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-4 flex items-center justify-end gap-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsEditingOfficersModal(false)}
+                  className="px-4 py-2.5 text-slate-600 hover:bg-slate-100 rounded-xl font-bold cursor-pointer"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  className="px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-black rounded-xl shadow-md transition active:scale-95 cursor-pointer flex items-center gap-2"
+                >
+                  <Check className="w-4 h-4" />
+                  <span>Lưu & Đồng bộ ngay</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Official School Rules Card: Session Times & Absence procedure from QĐ 525 */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

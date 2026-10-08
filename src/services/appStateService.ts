@@ -119,49 +119,41 @@ class AppStateService {
   // Active toast notifications
   public toasts: ToastNotification[] = [];
 
-  // Current logged in user (Default: Học sinh - Chế độ Chỉ xem)
+  // Current logged in user (Mặc định: GVCN Toàn quyền điều hành & quản lý)
   public currentUser: CurrentUser = {
-    id: 'user-guest',
-    name: 'Học sinh Lớp 10A16 (Chế độ Chỉ xem)',
-    role: 'hoc_sinh',
+    id: 'user-gvcn',
+    name: 'Giáo viên Chủ nhiệm (GVCN)',
+    role: 'gvcn',
     class_id: 'class-10a16',
-    isAuthenticatedOfficer: false,
+    isAuthenticatedOfficer: true,
   };
 
-  // Thông tin Quản lý Lớp học & Ban cán sự (GVCN có toàn quyền điều chỉnh)
+  // Thông tin Quản lý Lớp học & Ban cán sự (GVCN toàn quyền thay đổi không hạn chế)
   public classInfo: ClassInfo = {
     school_name: 'THPT Võ Trường Toản',
     class_name: 'Lớp 10A16',
     academic_year: '2026–2027',
     room_number: 'Phòng A2.04',
     gvcn_name: 'Thầy Trần Duy Tân',
-    gvcn_email: 'nouvo4344@gmail.com',
-    gvcn_phone: '0908 123 456',
+    gvcn_email: '',
+    gvcn_phone: '',
     class_president_name: 'Trần Đức Anh',
     class_vice_discipline_name: 'Lê Thiên Bảo',
     class_vice_academic_name: 'Nguyễn Gia Bảo',
     secretary_name: 'Lý Tú Uyên',
     slogan: 'Kỷ luật tự giác · Học tập hăng say · Tập thể vững mạnh',
     target_conduct_points: 9.0,
-    notes: 'Toàn thể học sinh thực hiện nghiêm túc QĐ 525/QĐ-THPT.VTT và Điều 8 TT 22/2021/TT-BGDĐT.',
+    notes: 'Toàn thể học sinh thực hiện nghiêm túc nề nếp và nội quy lớp học.',
   };
 
-  // Danh sách tài khoản Gmail & Mã PIN cán bộ được cấp quyền quản trị
+  // Danh sách tài khoản Cán sự quản trị (Bảo mật, không công khai thông tin cá nhân)
   public officerAccounts: OfficerAccount[] = [
     {
       id: 'acc-gvcn-user',
       role: 'gvcn',
       title: 'Giáo viên Chủ nhiệm',
       name: 'Thầy Trần Duy Tân',
-      email: 'nouvo4344@gmail.com',
-      pin: '1016',
-    },
-    {
-      id: 'acc-gvcn-alias',
-      role: 'gvcn',
-      title: 'Giáo viên Chủ nhiệm',
-      name: 'Thầy Trần Duy Tân',
-      email: 'tranduytan.gvcn@gmail.com',
+      email: '',
       pin: '1016',
     },
     {
@@ -169,7 +161,7 @@ class AppStateService {
       role: 'lop_truong',
       title: 'Lớp trưởng',
       name: 'Trần Đức Anh',
-      email: 'tranducanh.loptruong@gmail.com',
+      email: '',
       pin: '10A16lt',
     },
     {
@@ -177,7 +169,7 @@ class AppStateService {
       role: 'lop_pho',
       title: 'Lớp phó Kỷ luật & Nề nếp',
       name: 'Lê Thiên Bảo',
-      email: 'lethienbao.loppho@gmail.com',
+      email: '',
       pin: '10A16lp',
     },
   ];
@@ -253,42 +245,22 @@ class AppStateService {
       }
     }
 
-    // BẢO MẬT: Mặc định luôn là Học sinh (Chỉ xem).
-    // Chỉ phục hồi quyền Cán sự nếu có phiên làm việc đã xác thực trong localStorage.
+    // MẶC ĐỊNH: GVCN Toàn quyền điều hành & quản lý toàn bộ hệ thống không hạn chế
     if (typeof window !== 'undefined') {
       try {
-        const sessionRaw = localStorage.getItem('VTT_OFFICER_SESSION');
-        if (sessionRaw) {
-          const session = JSON.parse(sessionRaw);
-          if (
-            session &&
-            session.role &&
-            (session.role === 'gvcn' || session.role === 'lop_truong' || session.role === 'lop_pho')
-          ) {
-            const acc = this.officerAccounts.find((a) => a.role === session.role);
-            if (acc) {
-              this.setLoggedInRole(session.role);
-              this.currentUser.email = acc.email;
-              this.currentUser.isAuthenticatedOfficer = true;
-              return;
-            }
-          }
+        const savedRole = localStorage.getItem('VTT_CURRENT_ROLE');
+        if (savedRole === 'lop_truong' || savedRole === 'lop_pho') {
+          this.setLoggedInRole(savedRole as RoleType);
+        } else if (savedRole === 'hoc_sinh') {
+          this.setLoggedInRole('hoc_sinh');
+        } else {
+          this.setLoggedInRole('gvcn');
         }
-
-        const studentSessionRaw = localStorage.getItem('VTT_STUDENT_SESSION');
-        if (studentSessionRaw) {
-          const sSession = JSON.parse(studentSessionRaw);
-          if (sSession && sSession.email) {
-            this.setLoggedInRole('hoc_sinh');
-            this.currentUser.email = sSession.email;
-            this.currentUser.name = `Học sinh (${sSession.email})`;
-            this.currentUser.isAuthenticatedOfficer = false;
-            return;
-          }
-        }
-      } catch (e) {}
-      // Xóa bỏ vai trò cũ chưa xác thực
-      localStorage.removeItem('VTT_CURRENT_ROLE');
+      } catch (e) {
+        this.setLoggedInRole('gvcn');
+      }
+    } else {
+      this.setLoggedInRole('gvcn');
     }
   }
 
@@ -447,7 +419,7 @@ class AppStateService {
         });
 
         await supabase.from('audit_logs').insert([{
-          actor_name: this.currentUser.name || 'GVCN Thầy Tân',
+          actor_name: this.currentUser.name || this.classInfo.gvcn_name || 'GVCN',
           actor_role: this.currentUser.role || 'gvcn',
           action: 'SYNC_CLASS_INFO',
           entity_type: 'class_info',
@@ -496,7 +468,7 @@ class AppStateService {
         }, { onConflict: 'id' });
 
         await supabase.from('audit_logs').insert([{
-          actor_name: this.currentUser.name || 'GVCN Thầy Tân',
+          actor_name: this.currentUser.name || this.classInfo.gvcn_name || 'GVCN',
           actor_role: this.currentUser.role || 'gvcn',
           action: 'SYNC_CLASS_INFO',
           entity_type: 'class_info',
@@ -550,25 +522,115 @@ class AppStateService {
     }
   }
 
-  // --- Officer Accounts & Permissions Control ---
+  // --- Officer Accounts & Permissions Control (GVCN toàn quyền thay đổi không hạn chế) ---
   public updateOfficerAccount(id: string, updates: Partial<OfficerAccount>) {
     const acc = this.officerAccounts.find((a) => a.id === id);
     if (!acc) return;
     Object.assign(acc, updates);
-    this.addAuditLog(this.currentUser.name, `Cập nhật tài khoản cán sự [${acc.name}]`, 'officer_auth', id);
+
+    // Đồng bộ tức thời thông tin lớp học nếu là tài khoản GVCN hoặc cán sự chủ chốt
+    if (acc.role === 'gvcn') {
+      if (updates.name) this.classInfo.gvcn_name = updates.name;
+      if (updates.email) this.classInfo.gvcn_email = updates.email;
+      if (this.currentUser.role === 'gvcn') {
+        this.currentUser.name = `${this.classInfo.gvcn_name} (GVCN)`;
+        this.currentUser.email = this.classInfo.gvcn_email;
+      }
+    } else if (acc.role === 'lop_truong') {
+      if (updates.name) this.classInfo.class_president_name = updates.name;
+      if (this.currentUser.role === 'lop_truong') {
+        this.currentUser.name = `${this.classInfo.class_president_name} (Lớp trưởng)`;
+      }
+    } else if (acc.role === 'lop_pho') {
+      if (updates.name) this.classInfo.class_vice_discipline_name = updates.name;
+      if (this.currentUser.role === 'lop_pho') {
+        this.currentUser.name = `${this.classInfo.class_vice_discipline_name} (Lớp phó Kỷ luật)`;
+      }
+    }
+
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('VTT_OFFICER_ACCOUNTS', JSON.stringify(this.officerAccounts));
+        localStorage.setItem('VTT_CLASS_INFO', JSON.stringify(this.classInfo));
+      } catch (e) {}
+    }
+
+    this.addAuditLog(this.currentUser.name, `Cập nhật toàn quyền tài khoản cán bộ [${acc.name}]`, 'officer_auth', id);
     this.notify();
+
+    if (supabase) {
+      supabase.from('classes').upsert({
+        id: 'class-10a16',
+        name: this.classInfo.class_name,
+        academic_year_id: 'ay-2026-2027',
+        gvcn_name: this.classInfo.gvcn_name,
+      }).then();
+
+      supabase.from('audit_logs').insert([{
+        actor_name: this.currentUser.name,
+        actor_role: this.currentUser.role,
+        action: 'SYNC_CLASS_INFO',
+        entity_type: 'class_info',
+        entity_id: 'class-10a16',
+        reason: JSON.stringify({
+          classInfo: this.classInfo,
+          officerAccounts: this.officerAccounts,
+          groups: this.groups,
+        }),
+      }]).then();
+    }
   }
 
   public addOfficerAccount(newAcc: OfficerAccount) {
     this.officerAccounts.push(newAcc);
-    this.addAuditLog(this.currentUser.name, `Thêm tài khoản cán sự Gmail [${newAcc.email}]`, 'officer_auth', newAcc.id);
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('VTT_OFFICER_ACCOUNTS', JSON.stringify(this.officerAccounts));
+      } catch (e) {}
+    }
+    this.addAuditLog(this.currentUser.name, `Thêm tài khoản cán sự [${newAcc.name}]`, 'officer_auth', newAcc.id);
     this.notify();
+
+    if (supabase) {
+      supabase.from('audit_logs').insert([{
+        actor_name: this.currentUser.name,
+        actor_role: this.currentUser.role,
+        action: 'SYNC_CLASS_INFO',
+        entity_type: 'class_info',
+        entity_id: 'class-10a16',
+        reason: JSON.stringify({
+          classInfo: this.classInfo,
+          officerAccounts: this.officerAccounts,
+          groups: this.groups,
+        }),
+      }]).then();
+    }
   }
 
   public deleteOfficerAccount(id: string) {
     this.officerAccounts = this.officerAccounts.filter((a) => a.id !== id);
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('VTT_OFFICER_ACCOUNTS', JSON.stringify(this.officerAccounts));
+      } catch (e) {}
+    }
     this.addAuditLog(this.currentUser.name, `Xóa tài khoản cán sự [${id}]`, 'officer_auth', id);
     this.notify();
+
+    if (supabase) {
+      supabase.from('audit_logs').insert([{
+        actor_name: this.currentUser.name,
+        actor_role: this.currentUser.role,
+        action: 'SYNC_CLASS_INFO',
+        entity_type: 'class_info',
+        entity_id: 'class-10a16',
+        reason: JSON.stringify({
+          classInfo: this.classInfo,
+          officerAccounts: this.officerAccounts,
+          groups: this.groups,
+        }),
+      }]).then();
+    }
   }
 
   public authenticateWithGmail(email: string): {
