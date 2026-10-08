@@ -26,6 +26,8 @@ import {
   Users,
   CheckCircle2,
   Info,
+  History,
+  FileDown,
 } from 'lucide-react';
 
 const unaccent = (str: string) => {
@@ -224,7 +226,7 @@ export const SeatingPage: React.FC = () => {
       confirm(
         `Bạn có chắc muốn tự động sắp xếp lại chỗ ngồi ${
           method === 'by_group' ? 'theo Tổ học tập' : 'theo STT Danh sách'
-        } không?`
+        } không? (Hệ thống đã tự động lưu bản dự phòng trước đó để bạn có thể khôi phục bất cứ lúc nào)`
       )
     ) {
       appState.autoArrangeSeats(method);
@@ -238,9 +240,19 @@ export const SeatingPage: React.FC = () => {
   };
 
   const handleResetAllSeats = () => {
-    if (confirm('Bạn có chắc muốn LÀM TRỐNG TOÀN BỘ sơ đồ chỗ ngồi để xếp mới từ đầu không?')) {
+    if (confirm('⚠️ XÁC NHẬN: Bạn có chắc muốn LÀM TRỐNG TOÀN BỘ sơ đồ chỗ ngồi để xếp mới không?\n\nLưu ý: Hệ thống đã lưu sẵn Bản Dự Phòng. Nếu lỡ tay xóa, bạn chỉ cần bấm "↩️ Khôi phục Sơ đồ vừa làm" để quay lại ngay lập tức.')) {
+      appState.createSeatingBackupSnapshot();
       seats.forEach((seat) => appState.assignStudentToSeat(seat.id, undefined));
-      appState.showToast('Đã làm trống toàn bộ sơ đồ chỗ ngồi!', 'info');
+      appState.showToast('Đã làm trống toàn bộ sơ đồ chỗ ngồi! Bạn có thể bấm "↩️ Khôi phục Sơ đồ vừa làm" nếu muốn quay lại.', 'info');
+    }
+  };
+
+  const handleRestoreSeatingBackup = () => {
+    const success = appState.restorePreviousSeatingBackup();
+    if (success) {
+      appState.showToast('↺ Đã khôi phục thành công sơ đồ chỗ ngồi về trạng thái trước đó!', 'success');
+    } else {
+      appState.showToast('Chưa có bản sao lưu sơ đồ chỗ ngồi trước đó!', 'warn');
     }
   };
 
@@ -316,6 +328,44 @@ export const SeatingPage: React.FC = () => {
           }
         }
       `}</style>
+
+      {/* DATA SAFETY & AUTO-SAVE PERMANENT GUARANTEE BANNER */}
+      <div className="bg-emerald-950/90 border border-emerald-500/30 p-3.5 rounded-2xl text-white text-xs flex flex-col sm:flex-row items-center justify-between gap-3 shadow-md no-print">
+        <div className="flex items-center gap-3">
+          <span className="relative flex h-3.5 w-3.5 shrink-0">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-emerald-500"></span>
+          </span>
+          <div>
+            <div className="font-black text-emerald-300 uppercase tracking-wide flex items-center gap-1.5">
+              <span>🟢 TỰ ĐỘNG LƯU DỮ LIỆU TỨC THÌ (LƯU VĨNH VIỄN VÀO BỘ NHỚ LỚP)</span>
+            </div>
+            <p className="text-[11px] text-slate-300 mt-0.5">
+              Mọi thay đổi vị trí, gõ tên hay chuyển tổ đều được hệ thống tự động lưu 100% ngay khi thực hiện. Bạn không bao giờ sợ mất dữ liệu.
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          {appState.hasSeatingBackup() && (
+            <button
+              onClick={handleRestoreSeatingBackup}
+              className="px-3 py-1.5 bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold rounded-xl text-xs shadow-xs transition active:scale-95 flex items-center gap-1.5 cursor-pointer"
+              title="Khôi phục sơ đồ chỗ ngồi về trạng thái trước thao tác vừa rồi"
+            >
+              <History className="w-4 h-4 text-slate-950" />
+              <span>↩️ Khôi phục Sơ đồ vừa làm</span>
+            </button>
+          )}
+          <button
+            onClick={() => appState.exportFullDatabaseBackup()}
+            className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold rounded-xl text-xs transition flex items-center gap-1.5 cursor-pointer"
+            title="Tải về tệp sao lưu dữ liệu (.json) để cất giữ an toàn tuyệt đối"
+          >
+            <FileDown className="w-4 h-4 text-blue-400" />
+            <span>Tải Sao Lưu (.json)</span>
+          </button>
+        </div>
+      </div>
 
       {/* Header & Controls Bar */}
       <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-4 no-print">

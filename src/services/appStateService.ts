@@ -1243,6 +1243,62 @@ class AppStateService {
   }
 
   // --- Seating Management (Sơ đồ chỗ ngồi theo Cột & Tổ) ---
+  // Tự động tạo bản lưu dự phòng (Snapshot) sơ đồ chỗ ngồi trước khi thay đổi lớn
+  public createSeatingBackupSnapshot() {
+    if (typeof window === 'undefined') return;
+    try {
+      const backup = JSON.stringify({
+        timestamp: new Date().toISOString(),
+        seats: this.seats,
+        students: this.students.map(s => ({ id: s.id, group_id: s.group_id, seat_number: s.seat_number })),
+      });
+      localStorage.setItem('VTT_SEATS_BACKUP', backup);
+    } catch (e) {
+      console.warn('Lỗi lưu bản dự phòng sơ đồ:', e);
+    }
+  }
+
+  public restorePreviousSeatingBackup(): boolean {
+    if (typeof window === 'undefined') return false;
+    try {
+      const savedBackup = localStorage.getItem('VTT_SEATS_BACKUP');
+      if (!savedBackup) return false;
+      const parsed = JSON.parse(savedBackup);
+      if (parsed && Array.isArray(parsed.seats) && parsed.seats.length > 0) {
+        this.seats = parsed.seats;
+        if (Array.isArray(parsed.students)) {
+          parsed.students.forEach((savedStu: any) => {
+            const stu = this.students.find(s => s.id === savedStu.id);
+            if (stu) {
+              stu.group_id = savedStu.group_id;
+              stu.seat_number = savedStu.seat_number;
+            }
+          });
+        }
+        this.addAuditLog(
+          this.currentUser.name,
+          'Khôi phục sơ đồ chỗ ngồi từ bản sao lưu gần nhất',
+          'seating',
+          'restore'
+        );
+        this.notify();
+        return true;
+      }
+    } catch (e) {
+      console.error('Lỗi khôi phục bản sao lưu sơ đồ:', e);
+    }
+    return false;
+  }
+
+  public hasSeatingBackup(): boolean {
+    if (typeof window === 'undefined') return false;
+    try {
+      return Boolean(localStorage.getItem('VTT_SEATS_BACKUP'));
+    } catch (e) {
+      return false;
+    }
+  }
+
   // Tự động gán Tổ của học sinh theo Cột bàn ngồi (Cột 1: Tổ 1, Cột 2: Tổ 2, Cột 3: Tổ 3, Cột 4: Tổ 4)
   public syncStudentGroupWithSeatColumn(studentId: string, seat: Seat) {
     const stu = this.students.find((s) => s.id === studentId);
@@ -1268,6 +1324,7 @@ class AppStateService {
   public assignStudentToSeat(seatId: string, studentId?: string) {
     const seat = this.seats.find((s) => s.id === seatId);
     if (!seat) return;
+    this.createSeatingBackupSnapshot();
     if (studentId) {
       this.seats.forEach((s) => {
         if (s.id !== seatId && s.student_id === studentId) {
@@ -1296,6 +1353,7 @@ class AppStateService {
     const s1 = this.seats.find((s) => s.id === seatId1);
     const s2 = this.seats.find((s) => s.id === seatId2);
     if (!s1 || !s2) return;
+    this.createSeatingBackupSnapshot();
     const tempStu = s1.student_id;
     s1.student_id = s2.student_id;
     s2.student_id = tempStu;
@@ -1317,6 +1375,7 @@ class AppStateService {
   }
 
   public autoArrangeSeats(method: 'by_group' | 'by_roster' = 'by_roster') {
+    this.createSeatingBackupSnapshot();
     if (method === 'by_group') {
       // Sắp xếp học sinh thuộc từng Tổ 1..4 vào các Cột bàn 1..4 tương ứng
       const groupMap: Record<string, Student[]> = {};
