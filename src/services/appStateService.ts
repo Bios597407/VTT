@@ -476,7 +476,6 @@ class AppStateService {
           const parsed = JSON.parse(savedSeats);
           if (Array.isArray(parsed) && parsed.length > 0) this.seats = parsed;
         }
-        this.ensureCapacitySeats();
 
         const savedPlans = localStorage.getItem('VTT_SEATING_PLANS');
         if (savedPlans) {
@@ -499,16 +498,16 @@ class AppStateService {
           ];
           this.activeSeatingPlanId = 'plan-official';
         } else {
-          // Auto-sync active plan seats with current seats on startup
-          const activePlan = this.seatingPlans.find((p) => p.id === this.activeSeatingPlanId);
-          if (activePlan) {
-            if (this.seats.some((s) => s.student_id)) {
-              activePlan.seats = JSON.parse(JSON.stringify(this.seats));
-            } else if (activePlan.seats.some((s) => s.student_id)) {
-              this.seats = JSON.parse(JSON.stringify(activePlan.seats));
-            }
+          // Sync active plan seats with current seats on startup
+          const activePlan = this.seatingPlans.find((p) => p.id === this.activeSeatingPlanId) || this.seatingPlans[0];
+          this.activeSeatingPlanId = activePlan.id;
+          if (activePlan.seats && activePlan.seats.length > 0) {
+            this.seats = JSON.parse(JSON.stringify(activePlan.seats));
+          } else {
+            activePlan.seats = JSON.parse(JSON.stringify(this.seats));
           }
         }
+        this.ensureCapacitySeats();
 
         const savedDuty = localStorage.getItem('VTT_DUTY_ROSTER');
         if (savedDuty) {
@@ -1404,25 +1403,37 @@ class AppStateService {
 
   public ensureCapacitySeats() {
     const classId = 'class-10a16';
-    const existingMap = new Map(this.seats.map((s) => [s.id, s]));
+    const existingSeats = Array.isArray(this.seats) ? [...this.seats] : [];
     const seats: Seat[] = [];
+
     for (let r = 1; r <= 6; r++) {
       for (let c = 1; c <= 8; c++) {
         const id = `seat-${r}-${c}`;
         const colGroup = Math.ceil(c / 2);
         const tableNum = (r - 1) * 4 + colGroup;
-        if (existingMap.has(id)) {
-          seats.push(existingMap.get(id)!);
+
+        // Flexible match by ID or row and column
+        const found = existingSeats.find(
+          (s) => s.id === id || (s.row_number === r && s.col_number === c)
+        );
+
+        if (found) {
+          seats.push({
+            ...found,
+            id,
+            class_id: classId,
+            row_number: r,
+            col_number: c,
+            table_number: tableNum,
+          });
         } else {
-          const assignedIds = new Set(Array.from(existingMap.values()).map((s) => s.student_id).filter(Boolean));
-          const unassignedStu = this.students.find((s) => !assignedIds.has(s.id));
           seats.push({
             id,
             class_id: classId,
             row_number: r,
             col_number: c,
             table_number: tableNum,
-            student_id: unassignedStu ? unassignedStu.id : undefined,
+            student_id: undefined, // Empty seat, preserve user intention
           });
         }
       }
@@ -2731,6 +2742,23 @@ class AppStateService {
         await supabase.from('attendance_records').upsert(attendancePayload, { onConflict: 'student_id,date,session_id' });
       }
 
+      // 7. Sync Seating Plans & Class Info Snapshot to Supabase Audit Log
+      await supabase.from('audit_logs').insert([{
+        actor_name: this.currentUser.name || 'GVCN',
+        actor_role: this.currentUser.role || 'gvcn',
+        action: 'SYNC_CLASS_INFO',
+        entity_type: 'class_info',
+        entity_id: 'class-10a16',
+        reason: JSON.stringify({
+          classInfo: this.classInfo,
+          officerAccounts: this.officerAccounts,
+          groups: this.groups,
+          seatingPlans: this.seatingPlans,
+          activeSeatingPlanId: this.activeSeatingPlanId,
+          seats: this.seats,
+        }),
+      }]);
+
       this.lastSupabaseSyncTime = new Date().toLocaleTimeString('vi-VN');
       this.isSupabaseSyncing = false;
       this.addAuditLog(this.currentUser.name, 'Đồng bộ toàn bộ dữ liệu lên Supabase Cloud', 'cloud_sync', 'class-10a16');
@@ -2889,6 +2917,25 @@ class AppStateService {
             this.groups = parsed.groups;
             if (typeof window !== 'undefined') {
               localStorage.setItem('VTT_GROUPS', JSON.stringify(this.groups));
+            }
+          }
+          if (parsed.seatingPlans && Array.isArray(parsed.seatingPlans) && parsed.seatingPlans.length > 0) {
+            this.seatingPlans = parsed.seatingPlans;
+            if (typeof window !== 'undefined') {
+              localStorage.setItem('VTT_SEATING_PLANS', JSON.stringify(this.seatingPlans));
+            }
+          }
+          if (parsed.activeSeatingPlanId) {
+            this.activeSeatingPlanId = parsed.activeSeatingPlanId;
+            if (typeof window !== 'undefined') {
+              localStorage.setItem('VTT_ACTIVE_SEATING_PLAN_ID', this.activeSeatingPlanId);
+            }
+          }
+          if (parsed.seats && Array.isArray(parsed.seats) && parsed.seats.length > 0) {
+            this.seats = parsed.seats;
+            this.ensureCapacitySeats();
+            if (typeof window !== 'undefined') {
+              localStorage.setItem('VTT_SEATS', JSON.stringify(this.seats));
             }
           }
         }
