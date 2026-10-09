@@ -293,10 +293,36 @@ class AppStateService {
     return Math.ceil((until - now) / 1000);
   }
 
-  // Active page name and online user sessions tracking
+  // Active page name and real online user sessions tracking
   public activePageName: string = 'Trang Tổng Quan';
 
-  public getActiveSessions(): ActiveUserSession[] {
+  public currentSessionId: string = typeof window !== 'undefined'
+    ? (() => {
+        let sid = sessionStorage.getItem('VTT_TAB_SESSION_ID');
+        if (!sid) {
+          sid = 'session-' + generateUUID().slice(0, 8);
+          sessionStorage.setItem('VTT_TAB_SESSION_ID', sid);
+        }
+        return sid;
+      })()
+    : 'session-default';
+
+  public currentSessionLoginTime: string = typeof window !== 'undefined'
+    ? (() => {
+        let lt = sessionStorage.getItem('VTT_TAB_LOGIN_TIME');
+        if (!lt) {
+          lt = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+          sessionStorage.setItem('VTT_TAB_LOGIN_TIME', lt);
+        }
+        return lt;
+      })()
+    : 'Vừa xong';
+
+  private presenceSessionsMap: Map<string, ActiveUserSession> = new Map();
+  private presenceChannel: any = null;
+  private heartbeatIntervalTimer: any = null;
+
+  public getMyCurrentSessionObject(): ActiveUserSession & { lastActiveTimestamp: number } {
     const isOfficer = this.currentUser.isAuthenticatedOfficer;
     const currentName = isOfficer
       ? this.currentUser.name
@@ -311,67 +337,116 @@ class AppStateService {
         ? 'Lớp phó'
         : 'Học sinh Lớp 10A16';
 
-    const currentSession: ActiveUserSession = {
-      id: 'session-current-user',
-      name: `${currentName}`,
+    const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent : '';
+    const device = userAgent.includes('Mobile') || userAgent.includes('Android') || userAgent.includes('iPhone')
+      ? 'Thiết bị Di động (Mobile Safari / Chrome)'
+      : 'Máy tính Để bàn (Desktop Chrome / Edge)';
+
+    return {
+      id: this.currentSessionId,
+      name: currentName,
       role: this.currentUser.role,
       roleLabel: currentRoleLabel,
       currentPage: this.activePageName || 'Trang Tổng Quan',
-      loginTime: 'Vừa xong',
+      loginTime: this.currentSessionLoginTime,
       lastActive: 'Đang hoạt động',
-      device: typeof navigator !== 'undefined' && navigator.userAgent.includes('Mobile') ? 'Mobile Safari / iOS' : 'Desktop / Chrome Windows 11',
-      ipMasked: '113.161.xx.xx (TP. Hồ Chí Minh)',
+      lastActiveTimestamp: Date.now(),
+      device: device,
+      ipMasked: '113.161.xx.xx (Trực tuyến)',
       status: 'online',
       isCurrentUser: true,
-      avatarBg: 'bg-emerald-600',
+      avatarBg: this.currentUser.role === 'gvcn' ? 'bg-emerald-600' : this.currentUser.role === 'lop_truong' ? 'bg-blue-600' : 'bg-slate-600',
     };
+  }
 
-    const simulatedOthers: ActiveUserSession[] = [
-      {
-        id: 'session-01',
-        name: this.classInfo.class_president_name || 'Trần Đức Anh',
-        role: 'lop_truong',
-        roleLabel: 'Lớp trưởng',
-        currentPage: 'Trang Điểm Danh Lớp',
-        loginTime: '10 phút trước',
-        lastActive: '1 phút trước',
-        device: 'Laptop Windows 11 / Edge',
-        ipMasked: '14.241.xx.xx (Trường THPT Võ Trường Toản)',
-        status: 'online',
-        isCurrentUser: false,
-        avatarBg: 'bg-blue-600',
-      },
-      {
-        id: 'session-02',
-        name: this.classInfo.class_vice_discipline_name || 'Lê Thiên Bảo',
-        role: 'lop_pho',
-        roleLabel: 'Lớp phó Kỷ luật',
-        currentPage: 'Nhật Ký Vi Phạm Nề Nếp',
-        loginTime: '22 phút trước',
-        lastActive: '3 phút trước',
-        device: 'iPhone 15 / Safari iOS',
-        ipMasked: '171.244.xx.xx (Quận 12, TP.HCM)',
-        status: 'online',
-        isCurrentUser: false,
-        avatarBg: 'bg-purple-600',
-      },
-      {
-        id: 'session-03',
-        name: this.classInfo.secretary_name || 'Lưu Ngọc Linh',
-        role: 'lop_pho',
-        roleLabel: 'Bí thư Chi đoàn',
-        currentPage: 'Báo Cáo Khen Thưởng & Thi Đua',
-        loginTime: '35 phút trước',
-        lastActive: '5 phút trước',
-        device: 'Samsung Galaxy S24 / Android',
-        ipMasked: '27.72.xx.xx (Hóc Môn, TP.HCM)',
-        status: 'online',
-        isCurrentUser: false,
-        avatarBg: 'bg-amber-600',
-      },
-    ];
+  public updateSessionHeartbeat() {
+    if (typeof window === 'undefined') return;
+    const mySession = this.getMyCurrentSessionObject();
 
-    return [currentSession, ...simulatedOthers];
+    try {
+      const raw = localStorage.getItem('VTT_REALTIME_ACTIVE_SESSIONS');
+      let sessions: Record<string, ActiveUserSession & { lastActiveTimestamp: number }> = raw ? JSON.parse(raw) : {};
+      const now = Date.now();
+
+      // Prune dead sessions older than 10 seconds
+      Object.keys(sessions).forEach((sid) => {
+        if (!sessions[sid] || now - (sessions[sid].lastActiveTimestamp || 0) > 10000) {
+          delete sessions[sid];
+        }
+      });
+
+      sessions[this.currentSessionId] = mySession;
+      localStorage.setItem('VTT_REALTIME_ACTIVE_SESSIONS', JSON.stringify(sessions));
+    } catch (e) {}
+
+    if (this.presenceChannel) {
+      try {
+        this.presenceChannel.track(mySession);
+      } catch (e) {}
+    }
+  }
+
+  public startSessionTracking() {
+    if (typeof window === 'undefined') return;
+
+    this.updateSessionHeartbeat();
+    if (this.heartbeatIntervalTimer) clearInterval(this.heartbeatIntervalTimer);
+    this.heartbeatIntervalTimer = setInterval(() => {
+      this.updateSessionHeartbeat();
+      this.notify();
+    }, 3000);
+
+    window.addEventListener('beforeunload', () => {
+      try {
+        const raw = localStorage.getItem('VTT_REALTIME_ACTIVE_SESSIONS');
+        if (raw) {
+          let sessions = JSON.parse(raw);
+          delete sessions[this.currentSessionId];
+          localStorage.setItem('VTT_REALTIME_ACTIVE_SESSIONS', JSON.stringify(sessions));
+        }
+      } catch (e) {}
+    });
+  }
+
+  public getActiveSessions(): ActiveUserSession[] {
+    const sessionMap = new Map<string, ActiveUserSession>();
+
+    // 1. Read local active sessions from localStorage (other tabs on same browser/device)
+    if (typeof window !== 'undefined') {
+      try {
+        const raw = localStorage.getItem('VTT_REALTIME_ACTIVE_SESSIONS');
+        if (raw) {
+          const localSessions: Record<string, ActiveUserSession & { lastActiveTimestamp: number }> = JSON.parse(raw);
+          const now = Date.now();
+          Object.values(localSessions).forEach((s) => {
+            if (s && s.id && now - (s.lastActiveTimestamp || 0) <= 10000) {
+              sessionMap.set(s.id, {
+                ...s,
+                isCurrentUser: s.id === this.currentSessionId,
+              });
+            }
+          });
+        }
+      } catch (e) {}
+    }
+
+    // 2. Read remote active sessions from Supabase Realtime Presence channel
+    this.presenceSessionsMap.forEach((s, id) => {
+      if (!sessionMap.has(id)) {
+        sessionMap.set(id, {
+          ...s,
+          isCurrentUser: id === this.currentSessionId,
+        });
+      }
+    });
+
+    // 3. Guarantee current user session is always included
+    if (!sessionMap.has(this.currentSessionId)) {
+      sessionMap.set(this.currentSessionId, this.getMyCurrentSessionObject());
+    }
+
+    const result = Array.from(sessionMap.values());
+    return result.sort((a, b) => (a.isCurrentUser ? -1 : b.isCurrentUser ? 1 : 0));
   }
 
   public getActiveUsersCount(): number {
@@ -380,6 +455,7 @@ class AppStateService {
 
   public setActivePageName(pageName: string) {
     this.activePageName = pageName;
+    this.updateSessionHeartbeat();
     this.notify();
   }
 
@@ -607,6 +683,7 @@ class AppStateService {
     } else {
       this.setLoggedInRole('gvcn');
     }
+    this.startSessionTracking();
   }
 
   public subscribe(listener: () => void): () => void {
@@ -2633,6 +2710,38 @@ class AppStateService {
             this.fetchFromSupabase(true);
           })
           .subscribe();
+      }
+
+      // 3. Kích hoạt kênh giám sát sự hiện diện thời gian thực (Supabase Presence)
+      if (!this.presenceChannel) {
+        this.presenceChannel = supabase.channel('vtt_online_presence', {
+          config: { presence: { key: this.currentSessionId } },
+        });
+
+        this.presenceChannel
+          .on('presence', { event: 'sync' }, () => {
+            const newState = this.presenceChannel.presenceState();
+            const newMap = new Map<string, ActiveUserSession>();
+            Object.keys(newState).forEach((key) => {
+              const presences = newState[key] as any[];
+              if (presences && presences.length > 0) {
+                const latest = presences[presences.length - 1];
+                if (latest && latest.id) {
+                  newMap.set(latest.id, {
+                    ...latest,
+                    isCurrentUser: latest.id === this.currentSessionId,
+                  });
+                }
+              }
+            });
+            this.presenceSessionsMap = newMap;
+            this.notify();
+          })
+          .subscribe((status: string) => {
+            if (status === 'SUBSCRIBED') {
+              this.presenceChannel.track(this.getMyCurrentSessionObject()).catch(() => {});
+            }
+          });
       }
     } catch (e) {
       console.warn('Lỗi khởi tạo Supabase Sync:', e);
