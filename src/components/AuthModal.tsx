@@ -33,7 +33,11 @@ export const AuthModal: React.FC<Props> = ({ isOpen, onClose, promptMessage, onS
   const [gmailInput, setGmailInput] = useState('');
 
   // PIN form state
-  const [pinRole, setPinRole] = useState<'gvcn' | 'lop_truong' | 'lop_pho'>('gvcn');
+  const officerAccounts = appState.officerAccounts;
+  const [selectedAccountId, setSelectedAccountId] = useState<string>(
+    officerAccounts.find((a) => a.role === 'gvcn')?.id || officerAccounts[0]?.id || 'acc-gvcn-user'
+  );
+  const selectedOfficer = officerAccounts.find((a) => a.id === selectedAccountId) || officerAccounts[0];
   const [pinInput, setPinInput] = useState('');
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -79,7 +83,7 @@ export const AuthModal: React.FC<Props> = ({ isOpen, onClose, promptMessage, onS
       return;
     }
 
-    const res = appState.authenticateWithPin(pinRole, pinInput);
+    const res = appState.authenticateWithPin(selectedAccountId, pinInput);
     if (res.success) {
       setPinInput('');
       if (onSuccess) onSuccess();
@@ -240,53 +244,46 @@ export const AuthModal: React.FC<Props> = ({ isOpen, onClose, promptMessage, onS
             <form onSubmit={handleVerifyPin} className="space-y-4 pt-1">
               <div>
                 <label className="block font-bold text-slate-900 text-sm mb-2">
-                  Chọn chức danh cán sự cần mở khóa:
+                  Chọn chức danh cán sự cần mở khóa ({officerAccounts.length} cán bộ):
                 </label>
-                <div className="grid grid-cols-3 gap-2.5">
-                  <button
-                    type="button"
-                    onClick={() => setPinRole('gvcn')}
-                    className={`py-3 px-2 rounded-xl text-sm font-bold border transition cursor-pointer text-center ${
-                      pinRole === 'gvcn'
-                        ? 'border-emerald-500 bg-emerald-50 text-emerald-950 shadow-xs ring-2 ring-emerald-500/20'
-                        : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
-                    }`}
-                  >
-                    <div className="font-black text-sm">GVCN</div>
-                    <div className="text-xs opacity-80 font-semibold mt-0.5">Toàn quyền</div>
-                  </button>
-
-                   <button
-                    type="button"
-                    onClick={() => setPinRole('lop_truong')}
-                    className={`py-3 px-2 rounded-xl text-sm font-bold border transition cursor-pointer text-center ${
-                      pinRole === 'lop_truong'
-                        ? 'border-blue-500 bg-blue-50 text-blue-950 shadow-xs ring-2 ring-blue-500/20'
-                        : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
-                    }`}
-                  >
-                    <div className="font-black text-sm">Lớp phó Học tập</div>
-                    <div className="text-xs opacity-80 font-semibold mt-0.5">{classInfo.class_vice_academic_name}</div>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setPinRole('lop_pho')}
-                    className={`py-3 px-2 rounded-xl text-sm font-bold border transition cursor-pointer text-center ${
-                      pinRole === 'lop_pho'
-                        ? 'border-indigo-500 bg-indigo-50 text-indigo-950 shadow-xs ring-2 ring-indigo-500/20'
-                        : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
-                    }`}
-                  >
-                    <div className="font-black text-sm">Bí thư Chi đoàn</div>
-                    <div className="text-xs opacity-80 font-semibold mt-0.5">{classInfo.secretary_name}</div>
-                  </button>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 max-h-[220px] overflow-y-auto pr-1">
+                  {officerAccounts.map((acc) => {
+                    const isSelected = selectedAccountId === acc.id;
+                    return (
+                      <button
+                        key={acc.id}
+                        type="button"
+                        onClick={() => setSelectedAccountId(acc.id)}
+                        className={`p-3 rounded-xl text-left border transition cursor-pointer flex flex-col justify-between ${
+                          isSelected
+                            ? 'border-blue-600 bg-blue-50 text-blue-950 shadow-xs ring-2 ring-blue-500/30'
+                            : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-1">
+                          <span className="font-black text-xs truncate">{acc.title}</span>
+                          <span
+                            className={`text-[9px] font-black px-1.5 py-0.5 rounded ${
+                              acc.role === 'gvcn'
+                                ? 'bg-emerald-100 text-emerald-800'
+                                : 'bg-slate-100 text-slate-700'
+                            }`}
+                          >
+                            {acc.badge || (acc.role === 'gvcn' ? 'Toàn quyền' : 'Ban Cán Sự')}
+                          </span>
+                        </div>
+                        <div className="text-xs font-bold text-slate-900 mt-1 truncate">
+                          {acc.name}
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
               <div>
                 <label className="block font-bold text-slate-900 text-sm mb-2">
-                  Nhập Mã PIN bảo mật nội bộ:
+                  Nhập Mã PIN bảo mật của {selectedOfficer ? `[${selectedOfficer.title} - ${selectedOfficer.name}]` : 'Cán sự'}:
                 </label>
                 <div className="relative">
                   <KeyRound className="w-5 h-5 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -294,14 +291,14 @@ export const AuthModal: React.FC<Props> = ({ isOpen, onClose, promptMessage, onS
                     type="password"
                     required
                     autoFocus
-                    placeholder="Nhập mã PIN của Thầy/Cô hoặc Cán sự..."
+                    placeholder={selectedOfficer ? `Mã PIN của ${selectedOfficer.name}...` : 'Nhập mã PIN...'}
                     value={pinInput}
                     onChange={(e) => setPinInput(e.target.value)}
                     className="w-full pl-11 pr-4 py-3.5 border-2 rounded-xl border-slate-300 font-mono text-base tracking-widest focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:outline-hidden bg-white text-slate-900"
                   />
                 </div>
                 <p className="text-xs text-slate-500 mt-1.5">
-                  Mã PIN được GVCN bảo mật nội bộ, chống học sinh tự ý can thiệp dữ liệu.
+                  Mã PIN bảo mật nội bộ do GVCN quản lý, bảo vệ an toàn dữ liệu và quyền điều hành lớp.
                 </p>
               </div>
 

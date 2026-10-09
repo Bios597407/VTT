@@ -48,11 +48,55 @@ export const SettingsPage: React.FC = () => {
   }
 
   // New officer form state
-  const [newRole, setNewRole] = useState<'gvcn' | 'lop_truong' | 'lop_pho'>('lop_truong');
-  const [newTitle, setNewTitle] = useState('Lớp phó Học tập');
+  const [dropdownSelection, setDropdownSelection] = useState<string>('lop_pho_kyluat');
+  const [newRole, setNewRole] = useState<'gvcn' | 'lop_truong' | 'lop_pho'>('lop_pho');
+  const [newTitle, setNewTitle] = useState('Lớp phó Kỷ luật & Nề nếp');
   const [newName, setNewName] = useState('');
   const [newEmail, setNewEmail] = useState('');
-  const [newPin, setNewPin] = useState('');
+  const [newPin, setNewPin] = useState('10A16lpkl');
+  const [newDuties, setNewDuties] = useState('Quản lý vi phạm, theo dõi điểm danh & chấm điểm nề nếp tuần');
+  const [newBadge, setNewBadge] = useState('Ban Cán Sự');
+
+  const handleDropdownSelectionChange = (val: string) => {
+    setDropdownSelection(val);
+    if (val === 'lop_truong') {
+      setNewRole('lop_truong');
+      setNewTitle('Lớp trưởng');
+      setNewDuties('Điều hành chung toàn lớp, đại diện tập thể, tổng hợp báo cáo GVCN');
+      setNewPin('10A16lt');
+      setNewBadge('Ban Cán Sự');
+    } else if (val === 'lop_pho_kyluat') {
+      setNewRole('lop_pho');
+      setNewTitle('Lớp phó Kỷ luật & Nề nếp');
+      setNewDuties('Quản lý vi phạm, theo dõi điểm danh & chấm điểm nề nếp tuần');
+      setNewPin('10A16lpkl');
+      setNewBadge('Ban Cán Sự');
+    } else if (val === 'lop_pho_hoctap') {
+      setNewRole('lop_pho');
+      setNewTitle('Lớp phó Học tập');
+      setNewDuties('Theo dõi học vụ, sổ đầu bài, đôn đốc các môn học');
+      setNewPin('10A16lpht');
+      setNewBadge('Học vụ');
+    } else if (val === 'secretary') {
+      setNewRole('lop_pho');
+      setNewTitle('Bí thư Chi đoàn');
+      setNewDuties('Phong trào Đoàn thanh niên, công tác thanh niên & hoạt động phong trào');
+      setNewPin('10A16bt');
+      setNewBadge('Đoàn TN');
+    } else if (val === 'lop_pho_generic') {
+      setNewRole('lop_pho');
+      setNewTitle('Lớp phó / Cán sự');
+      setNewDuties('');
+      setNewPin('10A16cs');
+      setNewBadge('Ban Cán Sự');
+    } else if (val === 'gvcn') {
+      setNewRole('gvcn');
+      setNewTitle('Giáo viên Chủ nhiệm');
+      setNewDuties('Chỉ đạo toàn diện nề nếp & giáo dục toàn lớp');
+      setNewPin('1016');
+      setNewBadge('Toàn quyền');
+    }
+  };
 
   // Editing account state
   const [editingAccId, setEditingAccId] = useState<string | null>(null);
@@ -61,6 +105,8 @@ export const SettingsPage: React.FC = () => {
   const [editRole, setEditRole] = useState<'gvcn' | 'lop_truong' | 'lop_pho'>('gvcn');
   const [editEmail, setEditEmail] = useState('');
   const [editPin, setEditPin] = useState('');
+  const [editDuties, setEditDuties] = useState('');
+  const [editBadge, setEditBadge] = useState('');
 
   const [inputUrl, setInputUrl] = useState(
     localStorage.getItem('CUSTOM_SUPABASE_URL') || 'https://ziizirpucnapapgbfskw.supabase.co'
@@ -73,21 +119,24 @@ export const SettingsPage: React.FC = () => {
 
   const handleAddOfficer = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newEmail.trim() || !newName.trim()) return;
+    if (!newName.trim()) return;
 
     appState.addOfficerAccount({
       id: `acc-${Date.now()}`,
       role: newRole,
-      title: newTitle || (newRole === 'gvcn' ? 'Giáo viên Chủ nhiệm' : newRole === 'lop_truong' ? 'Lớp phó Học tập' : 'Bí thư Chi đoàn'),
+      title: newTitle.trim() || (newRole === 'gvcn' ? 'Giáo viên Chủ nhiệm' : newRole === 'lop_truong' ? 'Lớp trưởng' : 'Lớp phó Kỷ luật & Nề nếp'),
       name: newName.trim(),
       email: newEmail.trim().toLowerCase(),
-      pin: newPin.trim() || '10A16',
+      pin: newPin.trim() || '10A16cs',
+      duties: newDuties.trim() || 'Thực hiện nhiệm vụ theo phân công của GVCN',
+      badge: newBadge.trim() || 'Ban Cán Sự',
+      canManage: true,
     });
 
-    appState.showToast(`Đã thêm tài khoản cán bộ: ${newName.trim()} (${newEmail.trim()})!`, 'success');
+    appState.showToast(`Đã thêm vai trò cán bộ: [${newTitle.trim()}: ${newName.trim()}] thành công!`, 'success');
     setNewName('');
     setNewEmail('');
-    setNewPin('');
+    handleDropdownSelectionChange('lop_pho_kyluat');
   };
 
   const handleStartEditAcc = (acc: OfficerAccount) => {
@@ -95,18 +144,22 @@ export const SettingsPage: React.FC = () => {
     setEditName(acc.name);
     setEditTitle(acc.title);
     setEditRole(acc.role as any);
-    setEditEmail(acc.email);
+    setEditEmail(acc.email || '');
     setEditPin(acc.pin);
+    setEditDuties(acc.duties || '');
+    setEditBadge(acc.badge || 'Ban Cán Sự');
   };
 
   const handleSaveEditAcc = (id: string) => {
-    if (!editName.trim() || !editEmail.trim()) return;
+    if (!editName.trim()) return;
     appState.updateOfficerAccount(id, {
       name: editName.trim(),
       title: editTitle.trim(),
       role: editRole,
       email: editEmail.trim().toLowerCase(),
       pin: editPin.trim() || '1016',
+      duties: editDuties.trim(),
+      badge: editBadge.trim() || 'Ban Cán Sự',
     });
     appState.showToast('✅ Đã lưu cập nhật toàn quyền thông tin cán bộ!', 'success');
     setEditingAccId(null);
@@ -587,20 +640,28 @@ export const SettingsPage: React.FC = () => {
                       {acc.role === 'gvcn' ? 'GV' : acc.role === 'lop_truong' ? 'HT' : 'BT'}
                     </div>
                     <div>
-                      <div className="font-black text-slate-900 text-sm flex items-center gap-2">
+                      <div className="font-black text-slate-900 text-sm flex items-center gap-2 flex-wrap">
                         <span>{acc.name}</span>
                         <span className="text-[10px] px-2 py-0.5 bg-blue-100 text-blue-900 rounded-md font-bold border border-blue-200">
                           {acc.title}
                         </span>
+                        <span className="text-[10px] px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-md font-bold">
+                          {acc.badge || 'Ban Cán Sự'}
+                        </span>
                         {acc.role === 'gvcn' && (
-                          <span className="text-[10px] px-1.5 py-0.5 bg-emerald-600 text-white rounded font-bold">
+                          <span className="text-[10px] px-1.5 py-0.5 bg-blue-600 text-white rounded font-bold">
                             Chủ nhiệm
                           </span>
                         )}
                       </div>
+                      {acc.duties && (
+                        <div className="text-xs text-slate-600 mt-0.5 font-normal">
+                          <span className="font-semibold text-slate-700">Nhiệm vụ:</span> {acc.duties}
+                        </div>
+                      )}
                       <div className="text-xs text-slate-600 mt-1 flex flex-wrap items-center gap-3 font-mono">
-                        <span className="text-blue-700 font-semibold">{acc.email}</span>
-                        <span className="text-slate-400">·</span>
+                        {acc.email && <span className="text-blue-700 font-semibold">{acc.email}</span>}
+                        {acc.email && <span className="text-slate-400">·</span>}
                         <span className="text-slate-700 bg-white px-2 py-0.5 rounded border border-slate-200">
                           Mã PIN: <strong>{acc.pin}</strong>
                         </span>
@@ -618,29 +679,31 @@ export const SettingsPage: React.FC = () => {
                         <Edit3 className="w-3.5 h-3.5" />
                         <span>Sửa toàn quyền</span>
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteAcc(acc)}
-                        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition cursor-pointer"
-                        title="Xóa tài khoản này"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      {acc.role !== 'gvcn' && (
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteAcc(acc)}
+                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition cursor-pointer"
+                          title="Xóa tài khoản này"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
 
                 {/* Inline Full Edit Form for Any Officer including GVCN */}
                 {isEditing && (
-                  <div className="p-3.5 bg-white rounded-xl border border-blue-300 shadow-xs space-y-3 mt-2">
-                    <div className="font-bold text-slate-800 text-xs flex items-center gap-1.5 text-blue-900">
+                  <div className="p-4 bg-white rounded-xl border-2 border-blue-300 shadow-xs space-y-3 mt-2">
+                    <div className="font-bold text-xs flex items-center gap-1.5 text-blue-900">
                       <Edit3 className="w-3.5 h-3.5 text-blue-600" />
-                      <span>Chỉnh sửa toàn quyền nội dung cho cán bộ [{acc.name}]:</span>
+                      <span>Chỉnh sửa toàn quyền vai trò cho cán bộ [{acc.name}]:</span>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
                       <div>
-                        <label className="block text-[11px] font-bold text-slate-700 mb-0.5">Họ và tên:</label>
+                        <label className="block text-[11px] font-bold text-slate-700 mb-0.5">Họ và tên cán sự:</label>
                         <input
                           type="text"
                           required
@@ -652,38 +715,63 @@ export const SettingsPage: React.FC = () => {
                       </div>
 
                       <div>
-                        <label className="block text-[11px] font-bold text-slate-700 mb-0.5">Chức danh:</label>
+                        <label className="block text-[11px] font-bold text-slate-700 mb-0.5">Tên chức danh / vai trò (GVCN tự do ghi):</label>
                         <input
                           type="text"
                           required
                           value={editTitle}
                           onChange={(e) => setEditTitle(e.target.value)}
-                          placeholder="Chức danh..."
-                          className="w-full p-2 border rounded-lg bg-white border-slate-300 text-xs"
+                          placeholder="VD: Lớp trưởng, Lớp phó Kỷ luật & Nề nếp, Thủ quỹ..."
+                          className="w-full p-2 border rounded-lg bg-white border-slate-300 text-xs font-bold"
                         />
                       </div>
 
                       <div>
-                        <label className="block text-[11px] font-bold text-slate-700 mb-0.5">Vai trò hệ thống:</label>
+                        <label className="block text-[11px] font-bold text-slate-700 mb-0.5">Phân quyền hệ thống:</label>
                         <select
                           value={editRole}
                           onChange={(e) => setEditRole(e.target.value as any)}
                           className="w-full p-2 border rounded-lg bg-white border-slate-300 text-xs font-semibold"
                         >
-                          <option value="gvcn">GVCN (Toàn quyền)</option>
-                          <option value="lop_truong">Lớp phó Học tập (Ban Cán Sự)</option>
-                          <option value="lop_pho">Bí thư Chi đoàn (Ban Cán Sự)</option>
+                          <option value="gvcn">GVCN (Toàn quyền điều hành)</option>
+                          <option value="lop_truong">Lớp trưởng (Điều hành chung toàn lớp)</option>
+                          <option value="lop_pho">Lớp phó / Cán sự lớp (Kỷ luật, Học tập, Đoàn TN, Thủ quỹ...)</option>
                         </select>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                      <div className="sm:col-span-2">
+                        <label className="block text-[11px] font-bold text-slate-700 mb-0.5">Nội dung nhiệm vụ & Phân công công việc (GVCN chủ động ghi):</label>
+                        <input
+                          type="text"
+                          value={editDuties}
+                          onChange={(e) => setEditDuties(e.target.value)}
+                          placeholder="VD: Quản lý vi phạm, theo dõi điểm danh, chấm nề nếp..."
+                          className="w-full p-2 border rounded-lg bg-white border-slate-300 text-xs"
+                        />
                       </div>
 
                       <div>
-                        <label className="block text-[11px] font-bold text-slate-700 mb-0.5">Địa chỉ Gmail:</label>
+                        <label className="block text-[11px] font-bold text-slate-700 mb-0.5">Nhãn phân loại (Badge):</label>
+                        <input
+                          type="text"
+                          value={editBadge}
+                          onChange={(e) => setEditBadge(e.target.value)}
+                          placeholder="VD: Ban Cán Sự, Học vụ, Đoàn TN..."
+                          className="w-full p-2 border rounded-lg bg-white border-slate-300 text-xs"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 mb-0.5">Địa chỉ Gmail (Tùy chọn):</label>
                         <input
                           type="email"
-                          required
                           value={editEmail}
                           onChange={(e) => setEditEmail(e.target.value)}
-                          placeholder="Email Gmail..."
+                          placeholder="canbo@gmail.com (hoặc để trống)..."
                           className="w-full p-2 border rounded-lg bg-white border-slate-300 text-xs font-mono"
                         />
                       </div>
@@ -729,45 +817,68 @@ export const SettingsPage: React.FC = () => {
         <form onSubmit={handleAddOfficer} className="p-4 bg-blue-50/50 rounded-2xl border border-blue-200 text-xs space-y-3">
           <div className="font-bold text-blue-950 flex items-center gap-1.5 text-sm">
             <Plus className="w-4 h-4 text-blue-700" />
-            <span>Thêm tài khoản cán bộ mới (GVCN toàn quyền cấp phép):</span>
+            <span>Thêm vai trò cán bộ mới (Không khóa cứng — GVCN chủ động ghi nội dung):</span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
             <div>
-              <label className="block text-[11px] text-slate-600 mb-0.5">Vai trò:</label>
-              <select
-                value={newRole}
-                onChange={(e) => {
-                  const r = e.target.value as any;
-                  setNewRole(r);
-                  setNewTitle(r === 'gvcn' ? 'Giáo viên Chủ nhiệm' : r === 'lop_truong' ? 'Lớp phó Học tập' : 'Bí thư Chi đoàn');
-                }}
-                className="w-full p-2 border rounded-lg bg-white border-slate-300 text-xs"
-              >
-                <option value="gvcn">GVCN</option>
-                <option value="lop_truong">Lớp phó Học tập</option>
-                <option value="lop_pho">Bí thư Chi đoàn</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-[11px] text-slate-600 mb-0.5">Họ và tên cán bộ:</label>
+              <label className="block text-[11px] font-bold text-slate-700 mb-0.5">Tên chức danh / vai trò (GVCN tự do đặt tên):</label>
               <input
                 type="text"
                 required
-                placeholder="VD: Lê Thiên Bảo"
+                placeholder="VD: Lớp phó Kỷ luật & Nề nếp, Thủ quỹ lớp..."
+                value={newTitle}
+                onChange={(e) => setNewTitle(e.target.value)}
+                className="w-full p-2 border rounded-lg bg-white border-slate-300 text-xs font-bold"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-bold text-slate-700 mb-0.5">Họ và tên cán bộ:</label>
+              <input
+                type="text"
+                required
+                placeholder="VD: Nguyễn Gia Bảo"
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
+                className="w-full p-2 border rounded-lg bg-white border-slate-300 text-xs font-bold"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-bold text-slate-700 mb-0.5">Phân quyền hệ thống:</label>
+              <select
+                value={dropdownSelection}
+                onChange={(e) => handleDropdownSelectionChange(e.target.value)}
+                className="w-full p-2 border rounded-lg bg-white border-slate-300 text-xs font-semibold"
+              >
+                <option value="lop_truong">Lớp trưởng</option>
+                <option value="lop_pho_kyluat">Lớp phó Kỷ luật & Nề nếp</option>
+                <option value="lop_pho_hoctap">Lớp phó Học tập</option>
+                <option value="secretary">Bí thư Chi đoàn</option>
+                <option value="lop_pho_generic">Lớp phó / Cán sự lớp khác (Thủ quỹ, Lao động...)</option>
+                <option value="gvcn">GVCN (Toàn quyền)</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-2.5">
+            <div className="sm:col-span-2">
+              <label className="block text-[11px] text-slate-600 mb-0.5">Nội dung nhiệm vụ & Phân công (GVCN tự do ghi):</label>
+              <input
+                type="text"
+                placeholder="VD: Quản lý nề nếp, thu chi quỹ, theo dõi vi phạm..."
+                value={newDuties}
+                onChange={(e) => setNewDuties(e.target.value)}
                 className="w-full p-2 border rounded-lg bg-white border-slate-300 text-xs"
               />
             </div>
 
             <div>
-              <label className="block text-[11px] text-slate-600 mb-0.5">Địa chỉ Gmail:</label>
+              <label className="block text-[11px] text-slate-600 mb-0.5">Địa chỉ Gmail (Tùy chọn):</label>
               <input
                 type="email"
-                required
-                placeholder="canbo@gmail.com"
+                placeholder="canbo@gmail.com (hoặc để trống)"
                 value={newEmail}
                 onChange={(e) => setNewEmail(e.target.value)}
                 className="w-full p-2 border rounded-lg bg-white border-slate-300 text-xs font-mono"
@@ -775,10 +886,10 @@ export const SettingsPage: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-[11px] text-slate-600 mb-0.5">Mã PIN (hoặc để trống):</label>
+              <label className="block text-[11px] text-slate-600 mb-0.5">Mã PIN cán sự:</label>
               <input
                 type="text"
-                placeholder="VD: 10A16lp"
+                placeholder="VD: 10A16cs"
                 value={newPin}
                 onChange={(e) => setNewPin(e.target.value)}
                 className="w-full p-2 border rounded-lg bg-white border-slate-300 text-xs font-mono"
@@ -789,10 +900,10 @@ export const SettingsPage: React.FC = () => {
           <div className="flex justify-end pt-1">
             <button
               type="submit"
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg text-xs transition flex items-center gap-1.5 cursor-pointer"
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg text-xs transition flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95"
             >
               <Plus className="w-3.5 h-3.5" />
-              <span>Thêm vào Danh sách Cấp quyền</span>
+              <span>Thêm vai trò mới</span>
             </button>
           </div>
         </form>

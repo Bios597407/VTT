@@ -276,7 +276,7 @@ export const ReportsPage: React.FC = () => {
               <div>ĐẠI DIỆN BAN CÁN SỰ LỚP</div>
               <div className="text-[11px] text-slate-500 mt-0.5">(Ký và ghi rõ họ tên)</div>
               <div className="h-16"></div>
-              <div>{appState.classInfo.class_president_name || 'Trần Đức Anh'}</div>
+              <div>{appState.classInfo.class_president_name || 'Hoàng Trọng Minh'}</div>
             </div>
 
             <div className="text-center">

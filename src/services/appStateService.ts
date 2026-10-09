@@ -88,11 +88,15 @@ export interface ClassInfo {
 
 export interface OfficerAccount {
   id: string;
-  role: 'gvcn' | 'lop_truong' | 'lop_pho';
+  role: RoleType;
   title: string;
   name: string;
+  student_id?: string;
   email: string;
   pin: string;
+  duties?: string;
+  badge?: string;
+  canManage?: boolean;
 }
 
 export interface ToastNotification {
@@ -171,8 +175,8 @@ class AppStateService {
     gvcn_name: 'Thầy Trần Duy Tân',
     gvcn_email: '',
     gvcn_phone: '',
-    class_president_name: 'Trần Đức Anh',
-    class_vice_discipline_name: 'Lê Thiên Bảo',
+    class_president_name: 'Hoàng Trọng Minh',
+    class_vice_discipline_name: 'Nguyễn Gia Bảo',
     class_vice_academic_name: 'Nguyễn Ngọc Gia Hân',
     secretary_name: 'Lưu Ngọc Linh',
     slogan: 'Kỷ luật tự giác · Học tập hăng say · Tập thể vững mạnh',
@@ -180,7 +184,7 @@ class AppStateService {
     notes: 'Toàn thể học sinh thực hiện nghiêm túc nề nếp và nội quy lớp học.',
   };
 
-  // Danh sách tài khoản Cán sự quản trị (Bảo mật, không công khai thông tin cá nhân)
+  // Danh sách tài khoản Cán sự quản trị (Bảo mật, GVCN toàn quyền bổ sung & điều chỉnh chức danh tự do)
   public officerAccounts: OfficerAccount[] = [
     {
       id: 'acc-gvcn-user',
@@ -189,22 +193,57 @@ class AppStateService {
       name: 'Thầy Trần Duy Tân',
       email: '',
       pin: '1016',
+      duties: 'Chỉ đạo toàn diện nề nếp & giáo dục toàn lớp',
+      badge: 'Toàn quyền',
+      canManage: true,
     },
     {
-      id: 'acc-lt',
+      id: 'acc-lt-truong',
       role: 'lop_truong',
+      title: 'Lớp trưởng',
+      name: 'Hoàng Trọng Minh',
+      student_id: '10A16-23',
+      email: '',
+      pin: '10A16lt',
+      duties: 'Điều hành chung toàn lớp, đại diện tập thể, tổng hợp báo cáo GVCN',
+      badge: 'Ban Cán Sự',
+      canManage: true,
+    },
+    {
+      id: 'acc-lp-kyluat',
+      role: 'lop_pho',
+      title: 'Lớp phó Kỷ luật & Nề nếp',
+      name: 'Nguyễn Gia Bảo',
+      student_id: '10A16-03',
+      email: '',
+      pin: '10A16lpkl',
+      duties: 'Quản lý vi phạm, theo dõi điểm danh & chấm điểm nề nếp tuần',
+      badge: 'Ban Cán Sự',
+      canManage: true,
+    },
+    {
+      id: 'acc-lp-hoctap',
+      role: 'lop_pho',
       title: 'Lớp phó Học tập',
       name: 'Nguyễn Ngọc Gia Hân',
+      student_id: '10A16-12',
       email: '',
       pin: '10A16lpht',
+      duties: 'Theo dõi học vụ, sổ đầu bài, đôn đốc các môn học',
+      badge: 'Học vụ',
+      canManage: true,
     },
     {
-      id: 'acc-lp',
+      id: 'acc-bt-chidoan',
       role: 'lop_pho',
       title: 'Bí thư Chi đoàn',
       name: 'Lưu Ngọc Linh',
+      student_id: '10A16-20',
       email: '',
       pin: '10A16bt',
+      duties: 'Phong trào Đoàn thanh niên, công tác thanh niên & hoạt động phong trào',
+      badge: 'Đoàn TN',
+      canManage: true,
     },
   ];
 
@@ -516,28 +555,107 @@ class AppStateService {
             this.classInfo = { ...this.classInfo, ...parsed };
           }
         }
+        this.enforceOfficialOfficers();
 
         const savedOfficers = localStorage.getItem('VTT_OFFICER_ACCOUNTS');
         if (savedOfficers) {
           const parsed = JSON.parse(savedOfficers);
           if (Array.isArray(parsed) && parsed.length > 0) {
-            // Đồng bộ và tự khắc phục dữ liệu cũ (Self-healing & title sync):
-            // Giữ lại PIN/Email của người dùng nhưng đồng bộ đúng Title và khôi phục tài khoản nếu thiếu
-            this.officerAccounts = this.officerAccounts.map(defaultAcc => {
-              const matched = parsed.find((a: any) => a.role === defaultAcc.role);
-              if (matched) {
+            // Bảo lưu tất cả tài khoản tự do mà GVCN đã thêm vào (Không khóa cứng)
+            const updatedList = parsed.map((a: any) => {
+              if (a.id === 'acc-lt-truong' || (a.role === 'lop_truong' && a.title?.includes('Lớp trưởng'))) {
                 return {
-                  ...defaultAcc,
-                  name: matched.name || defaultAcc.name,
-                  email: matched.email || defaultAcc.email,
-                  pin: matched.pin || defaultAcc.pin,
-                  title: defaultAcc.title, // Luôn cập nhật chức danh chuẩn mới nhất
+                  ...a,
+                  id: 'acc-lt-truong',
+                  name: 'Hoàng Trọng Minh',
+                  title: 'Lớp trưởng',
+                  role: 'lop_truong',
+                  student_id: '10A16-23',
+                  duties: a.duties || 'Điều hành chung toàn lớp, đại diện tập thể, tổng hợp báo cáo GVCN',
+                  badge: 'Ban Cán Sự',
+                  canManage: true,
                 };
               }
-              return defaultAcc;
+              if (a.id === 'acc-lp-kyluat' || a.title?.includes('Kỷ luật')) {
+                return {
+                  ...a,
+                  id: 'acc-lp-kyluat',
+                  name: 'Nguyễn Gia Bảo',
+                  title: 'Lớp phó Kỷ luật & Nề nếp',
+                  role: 'lop_pho',
+                  student_id: '10A16-03',
+                  duties: a.duties || 'Quản lý vi phạm, theo dõi điểm danh & chấm điểm nề nếp tuần',
+                  badge: 'Ban Cán Sự',
+                  canManage: true,
+                };
+              }
+              if (a.id === 'acc-lp-hoctap' || a.title?.includes('Học tập')) {
+                return {
+                  ...a,
+                  id: 'acc-lp-hoctap',
+                  name: 'Nguyễn Ngọc Gia Hân',
+                  title: 'Lớp phó Học tập',
+                  role: 'lop_pho',
+                  student_id: '10A16-12',
+                  duties: a.duties || 'Theo dõi học vụ, sổ đầu bài, đôn đốc các môn học',
+                  badge: 'Học vụ',
+                  canManage: true,
+                };
+              }
+              if (a.id === 'acc-bt-chidoan' || a.title?.includes('Bí thư')) {
+                return {
+                  ...a,
+                  id: 'acc-bt-chidoan',
+                  name: 'Lưu Ngọc Linh',
+                  title: 'Bí thư Chi đoàn',
+                  role: 'lop_pho',
+                  student_id: '10A16-20',
+                  duties: a.duties || 'Phong trào Đoàn thanh niên, công tác thanh niên & hoạt động phong trào',
+                  badge: 'Đoàn TN',
+                  canManage: true,
+                };
+              }
+              return {
+                ...a,
+                canManage: a.canManage !== undefined ? a.canManage : (a.role === 'gvcn' || a.role === 'lop_truong' || a.role === 'lop_pho'),
+              };
             });
+
+            // Đảm bảo luôn có Lớp trưởng và Lớp phó Kỷ luật
+            if (!updatedList.some((a: any) => a.id === 'acc-lt-truong' || a.title?.includes('Lớp trưởng'))) {
+              updatedList.splice(1, 0, {
+                id: 'acc-lt-truong',
+                role: 'lop_truong',
+                title: 'Lớp trưởng',
+                name: 'Hoàng Trọng Minh',
+                student_id: '10A16-23',
+                email: '',
+                pin: '10A16lt',
+                duties: 'Điều hành chung toàn lớp, đại diện tập thể, tổng hợp báo cáo GVCN',
+                badge: 'Ban Cán Sự',
+                canManage: true,
+              });
+            }
+            if (!updatedList.some((a: any) => a.id === 'acc-lp-kyluat' || a.title?.includes('Kỷ luật'))) {
+              updatedList.splice(2, 0, {
+                id: 'acc-lp-kyluat',
+                role: 'lop_pho',
+                title: 'Lớp phó Kỷ luật & Nề nếp',
+                name: 'Nguyễn Gia Bảo',
+                student_id: '10A16-03',
+                email: '',
+                pin: '10A16lpkl',
+                duties: 'Quản lý vi phạm, theo dõi điểm danh & chấm điểm nề nếp tuần',
+                badge: 'Ban Cán Sự',
+                canManage: true,
+              });
+            }
+
+            this.officerAccounts = updatedList;
           }
         }
+
+        this.enforceOfficialOfficers();
 
         const savedGroups = localStorage.getItem('VTT_GROUPS');
         if (savedGroups) {
@@ -724,12 +842,12 @@ class AppStateService {
 
   // --- High-Security Access Control Guards ---
   public isWriteAuthorized(): boolean {
-    return Boolean(
-      this.currentUser.isAuthenticatedOfficer &&
-      (this.currentUser.role === 'gvcn' ||
-       this.currentUser.role === 'lop_truong' ||
-       this.currentUser.role === 'lop_pho')
-    );
+    if (!this.currentUser.isAuthenticatedOfficer) return false;
+    const r = this.currentUser.role;
+    if (r === 'gvcn' || r === 'lop_truong' || r === 'lop_pho') return true;
+    const acc = this.officerAccounts.find((a) => a.id === this.currentUser.id || a.email === this.currentUser.email || a.name === this.currentUser.name);
+    if (acc && acc.canManage !== false) return true;
+    return false;
   }
 
   public checkWriteAuthorization(): boolean {
@@ -781,6 +899,131 @@ class AppStateService {
         s.seat_number = undefined;
       }
     });
+  }
+
+  public enforceOfficialOfficers() {
+    // 1. Chuẩn hóa chính thức danh tính Ban Cán Sự Lớp 10A16 theo yêu cầu của GVCN
+    this.classInfo.class_president_name = 'Hoàng Trọng Minh';
+    this.classInfo.class_vice_discipline_name = 'Nguyễn Gia Bảo';
+    this.classInfo.class_vice_academic_name = 'Nguyễn Ngọc Gia Hân';
+    this.classInfo.secretary_name = 'Lưu Ngọc Linh';
+
+    // 2. Chuẩn hóa danh sách tài khoản cán sự quản trị
+    if (this.officerAccounts && Array.isArray(this.officerAccounts)) {
+      this.officerAccounts = this.officerAccounts.map((a: any) => {
+        if (a.id === 'acc-lt-truong' || (a.role === 'lop_truong' && a.title?.includes('Lớp trưởng'))) {
+          return {
+            ...a,
+            id: 'acc-lt-truong',
+            name: 'Hoàng Trọng Minh',
+            title: 'Lớp trưởng',
+            role: 'lop_truong',
+            student_id: '10A16-23',
+            duties: a.duties || 'Điều hành chung toàn lớp, đại diện tập thể, tổng hợp báo cáo GVCN',
+            badge: 'Ban Cán Sự',
+            canManage: true,
+          };
+        }
+        if (a.id === 'acc-lp-kyluat' || a.title?.includes('Kỷ luật')) {
+          return {
+            ...a,
+            id: 'acc-lp-kyluat',
+            name: 'Nguyễn Gia Bảo',
+            title: 'Lớp phó Kỷ luật & Nề nếp',
+            role: 'lop_pho',
+            student_id: '10A16-03',
+            duties: a.duties || 'Quản lý vi phạm, theo dõi điểm danh & chấm điểm nề nếp tuần',
+            badge: 'Ban Cán Sự',
+            canManage: true,
+          };
+        }
+        if (a.id === 'acc-lp-hoctap' || a.title?.includes('Học tập')) {
+          return {
+            ...a,
+            id: 'acc-lp-hoctap',
+            name: 'Nguyễn Ngọc Gia Hân',
+            title: 'Lớp phó Học tập',
+            role: 'lop_pho',
+            student_id: '10A16-12',
+            duties: a.duties || 'Theo dõi học vụ, sổ đầu bài, đôn đốc các môn học',
+            badge: 'Học vụ',
+            canManage: true,
+          };
+        }
+        if (a.id === 'acc-bt-chidoan' || a.title?.includes('Bí thư')) {
+          return {
+            ...a,
+            id: 'acc-bt-chidoan',
+            name: 'Lưu Ngọc Linh',
+            title: 'Bí thư Chi đoàn',
+            role: 'lop_pho',
+            student_id: '10A16-20',
+            duties: a.duties || 'Phong trào Đoàn thanh niên, công tác thanh niên & hoạt động phong trào',
+            badge: 'Đoàn TN',
+            canManage: true,
+          };
+        }
+        return a;
+      });
+
+      // Bảo đảm các tài khoản bắt buộc này phải tồn tại trong mảng
+      if (!this.officerAccounts.some((a: any) => a.id === 'acc-lt-truong')) {
+        this.officerAccounts.splice(1, 0, {
+          id: 'acc-lt-truong',
+          role: 'lop_truong',
+          title: 'Lớp trưởng',
+          name: 'Hoàng Trọng Minh',
+          student_id: '10A16-23',
+          email: '',
+          pin: '10A16lt',
+          duties: 'Điều hành chung toàn lớp, đại diện tập thể, tổng hợp báo cáo GVCN',
+          badge: 'Ban Cán Sự',
+          canManage: true,
+        });
+      }
+      if (!this.officerAccounts.some((a: any) => a.id === 'acc-lp-kyluat')) {
+        this.officerAccounts.splice(2, 0, {
+          id: 'acc-lp-kyluat',
+          role: 'lop_pho',
+          title: 'Lớp phó Kỷ luật & Nề nếp',
+          name: 'Nguyễn Gia Bảo',
+          student_id: '10A16-03',
+          email: '',
+          pin: '10A16lpkl',
+          duties: 'Quản lý vi phạm, theo dõi điểm danh & chấm điểm nề nếp tuần',
+          badge: 'Ban Cán Sự',
+          canManage: true,
+        });
+      }
+      if (!this.officerAccounts.some((a: any) => a.id === 'acc-lp-hoctap')) {
+        this.officerAccounts.push({
+          id: 'acc-lp-hoctap',
+          role: 'lop_pho',
+          title: 'Lớp phó Học tập',
+          name: 'Nguyễn Ngọc Gia Hân',
+          student_id: '10A16-12',
+          email: '',
+          pin: '10A16lpht',
+          duties: 'Theo dõi học vụ, sổ đầu bài, đôn đốc các môn học',
+          badge: 'Học vụ',
+          canManage: true,
+        });
+      }
+      if (!this.officerAccounts.some((a: any) => a.id === 'acc-bt-chidoan')) {
+        this.officerAccounts.push({
+          id: 'acc-bt-chidoan',
+          role: 'lop_pho',
+          title: 'Bí thư Chi đoàn',
+          name: 'Lưu Ngọc Linh',
+          student_id: '10A16-20',
+          email: '',
+          pin: '10A16bt',
+          duties: 'Phong trào Đoàn thanh niên, công tác thanh niên & hoạt động phong trào',
+          badge: 'Đoàn TN',
+          canManage: true,
+        });
+      }
+    }
   }
 
   public saveLocalState() {
@@ -1035,13 +1278,12 @@ class AppStateService {
         isAuthenticatedOfficer: true,
       };
     } else if (role === 'lop_truong') {
-      const studentLt = this.students.find(
-        (s) => s.full_name === this.classInfo.class_vice_academic_name
-      ) || this.students[0];
-      const ltAcc = this.officerAccounts.find((a) => a.role === 'lop_truong');
+      const ltAcc = this.officerAccounts.find((a) => a.id === 'acc-lt-truong' || a.role === 'lop_truong' || a.title?.includes('Lớp trưởng'));
+      const ltName = this.classInfo.class_president_name || ltAcc?.name || 'Hoàng Trọng Minh';
+      const studentLt = this.students.find((s) => s.full_name === ltName) || this.students.find((s) => s.id === '10A16-23');
       this.currentUser = {
         id: 'user-lt',
-        name: `${this.classInfo.class_vice_academic_name || studentLt?.full_name || 'Nguyễn Ngọc Gia Hân'} (Lớp phó Học tập)`,
+        name: `${ltName} (${ltAcc?.title || 'Lớp trưởng'})`,
         role: 'lop_truong',
         class_id: 'class-10a16',
         student_id: studentLt?.id,
@@ -1049,13 +1291,12 @@ class AppStateService {
         isAuthenticatedOfficer: true,
       };
     } else if (role === 'lop_pho') {
-      const studentLp = this.students.find(
-        (s) => s.full_name === this.classInfo.secretary_name
-      ) || this.students[1];
-      const lpAcc = this.officerAccounts.find((a) => a.role === 'lop_pho');
+      const lpAcc = this.officerAccounts.find((a) => a.id === 'acc-lp-kyluat' || a.title?.includes('Kỷ luật') || a.role === 'lop_pho');
+      const lpName = this.classInfo.class_vice_discipline_name || lpAcc?.name || 'Nguyễn Gia Bảo';
+      const studentLp = this.students.find((s) => s.full_name === lpName) || this.students.find((s) => s.id === '10A16-03');
       this.currentUser = {
         id: 'user-lp',
-        name: `${this.classInfo.secretary_name || studentLp?.full_name || 'Lưu Ngọc Linh'} (Bí thư Chi đoàn)`,
+        name: `${lpName} (${lpAcc?.title || 'Lớp phó Kỷ luật & Nề nếp'})`,
         role: 'lop_pho',
         class_id: 'class-10a16',
         student_id: studentLp?.id,
@@ -1094,18 +1335,53 @@ class AppStateService {
     this.notify();
   }
 
+  public setLoggedInOfficer(officerId: string) {
+    const acc = this.officerAccounts.find((a) => a.id === officerId);
+    if (!acc) return;
+    const stu = acc.student_id ? this.students.find((s) => s.id === acc.student_id) : this.students.find((s) => s.full_name === acc.name);
+    this.currentUser = {
+      id: `user-${acc.id}`,
+      name: `${acc.name} (${acc.title})`,
+      role: (acc.role as RoleType) || 'lop_pho',
+      class_id: 'class-10a16',
+      student_id: stu?.id,
+      email: acc.email,
+      isAuthenticatedOfficer: true,
+    };
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('VTT_CURRENT_ROLE', acc.role);
+        localStorage.setItem(
+          'VTT_OFFICER_SESSION',
+          JSON.stringify({ role: acc.role, email: acc.email, name: acc.name, officerId: acc.id, timestamp: Date.now() })
+        );
+      } catch (e) {}
+    }
+    this.updateSessionHeartbeat();
+    this.saveLocalState();
+    this.notify();
+  }
+
   // --- Class Management & Settings (GVCN toàn quyền thay đổi không hạn chế) ---
   public async updateClassInfo(updates: Partial<ClassInfo>) {
     if (!this.checkWriteAuthorization()) return;
     Object.assign(this.classInfo, updates);
 
     // Đồng bộ tức thời danh sách tài khoản cán sự
+    if (updates.class_president_name) {
+      const ltAcc = this.officerAccounts.find((a) => a.id === 'acc-lt-truong' || a.role === 'lop_truong' || a.title?.includes('Lớp trưởng'));
+      if (ltAcc) ltAcc.name = updates.class_president_name;
+    }
+    if (updates.class_vice_discipline_name) {
+      const lpKlAcc = this.officerAccounts.find((a) => a.id === 'acc-lp-kyluat' || a.title?.includes('Kỷ luật'));
+      if (lpKlAcc) lpKlAcc.name = updates.class_vice_discipline_name;
+    }
     if (updates.class_vice_academic_name) {
-      const ltAcc = this.officerAccounts.find((a) => a.role === 'lop_truong');
+      const ltAcc = this.officerAccounts.find((a) => a.id === 'acc-lp-hoctap' || a.id === 'acc-lt' || a.title?.includes('Học tập'));
       if (ltAcc) ltAcc.name = updates.class_vice_academic_name;
     }
     if (updates.secretary_name) {
-      const lpAcc = this.officerAccounts.find((a) => a.role === 'lop_pho');
+      const lpAcc = this.officerAccounts.find((a) => a.id === 'acc-bt-chidoan' || a.id === 'acc-lp' || a.title?.includes('Bí thư'));
       if (lpAcc) lpAcc.name = updates.secretary_name;
     }
     if (updates.gvcn_name) {
@@ -1120,9 +1396,9 @@ class AppStateService {
     if (this.currentUser.role === 'gvcn') {
       this.currentUser.name = `${this.classInfo.gvcn_name} (GVCN)`;
     } else if (this.currentUser.role === 'lop_truong') {
-      this.currentUser.name = `${this.classInfo.class_vice_academic_name} (Lớp phó Học tập)`;
+      this.currentUser.name = `${this.classInfo.class_president_name} (Lớp trưởng)`;
     } else if (this.currentUser.role === 'lop_pho') {
-      this.currentUser.name = `${this.classInfo.secretary_name} (Bí thư Chi đoàn)`;
+      this.currentUser.name = `${this.classInfo.class_vice_discipline_name} (Lớp phó Kỷ luật)`;
     }
 
     // Lưu ngay lập tức vào LocalStorage để không bao giờ bị mất dữ liệu
@@ -1417,8 +1693,18 @@ class AppStateService {
     }
   }
 
-  public authenticateWithPin(role: 'gvcn' | 'lop_truong' | 'lop_pho', pinInput: string): { success: boolean; account?: OfficerAccount; message: string } {
-    const remainingSecs = this.getLockoutRemainingSeconds(role);
+  public authenticateWithPin(accountOrRoleId: string, pinInput: string): { success: boolean; account?: OfficerAccount; message: string } {
+    const cleanPin = pinInput.trim();
+    const found = this.officerAccounts.find((a) => a.id === accountOrRoleId)
+      || this.officerAccounts.find((a) => a.role === accountOrRoleId)
+      || this.officerAccounts.find((a) => a.title.toLowerCase() === accountOrRoleId.toLowerCase());
+
+    if (!found) {
+      return { success: false, message: 'Không tìm thấy vai trò cán bộ này trong hệ thống.' };
+    }
+
+    const lockKey = found.id;
+    const remainingSecs = this.getLockoutRemainingSeconds(lockKey);
     if (remainingSecs > 0) {
       return {
         success: false,
@@ -1426,28 +1712,31 @@ class AppStateService {
       };
     }
 
-    const cleanPin = pinInput.trim();
-    const found = this.officerAccounts.find((a) => a.role === role);
-    if (!found) {
-      return { success: false, message: 'Không tìm thấy vai trò cán bộ này.' };
-    }
-
     // Mã PIN chuẩn mặc định của Ban Cán Sự
     const officialPins: Record<string, string> = {
+      'acc-gvcn-user': '1016',
+      'acc-lt-truong': '10A16lt',
+      'acc-lp-kyluat': '10A16lpkl',
+      'acc-lp-hoctap': '10A16lpht',
+      'acc-lt': '10A16lpht',
+      'acc-bt-chidoan': '10A16bt',
+      'acc-lp': '10A16bt',
       gvcn: '1016',
-      lop_truong: '10A16lpht',
-      lop_pho: '10A16bt',
+      lop_truong: '10A16lt',
+      lop_pho: '10A16lpkl',
     };
 
-    const isMatch = (found.pin === cleanPin) || (officialPins[role] === cleanPin);
+    const isMatch = (found.pin && found.pin === cleanPin) 
+      || (officialPins[found.id] === cleanPin) 
+      || (officialPins[found.role] === cleanPin);
 
     if (!isMatch) {
-      const attempts = (this.failedPinAttempts[role] || 0) + 1;
-      this.failedPinAttempts[role] = attempts;
+      const attempts = (this.failedPinAttempts[lockKey] || 0) + 1;
+      this.failedPinAttempts[lockKey] = attempts;
 
       if (attempts >= 5) {
         // Lock out for 3 minutes (180s)
-        this.lockoutUntil[role] = Date.now() + 180 * 1000;
+        this.lockoutUntil[lockKey] = Date.now() + 180 * 1000;
         this.addAuditLog('Hệ thống Bảo mật', `CẢNH BÁO: Phát hiện dò PIN sai ${attempts} lần liên tiếp cho ${found.title}. Đã kích hoạt Khóa Tạm Thời 3 phút!`, 'security_alert', found.id);
         this.notify();
         return {
@@ -1464,7 +1753,7 @@ class AppStateService {
     }
 
     // Reset failed attempts on success
-    this.clearFailedAttempts(role);
+    this.clearFailedAttempts(lockKey);
 
     // Tự động sửa lỗi dữ liệu cũ (Self-healing): Nếu mã PIN trong bộ nhớ khác mã PIN chuẩn mà người dùng nhập đúng
     if (found.pin !== cleanPin) {
@@ -1476,17 +1765,17 @@ class AppStateService {
       }
     }
 
-    this.setLoggedInRole(found.role);
+    this.setLoggedInOfficer(found.id);
     this.currentUser.isAuthenticatedOfficer = true;
     if (typeof window !== 'undefined') {
       try {
         localStorage.setItem(
           'VTT_OFFICER_SESSION',
-          JSON.stringify({ role: found.role, email: found.email, name: found.name, timestamp: Date.now() })
+          JSON.stringify({ role: found.role, email: found.email, name: found.name, officerId: found.id, timestamp: Date.now() })
         );
       } catch (e) {}
     }
-    this.addAuditLog(found.name, `Xác thực thành công qua Mã PIN bảo mật`, 'auth', found.id);
+    this.addAuditLog(found.name, `Xác thực thành công qua Mã PIN bảo mật cho chức danh [${found.title}]`, 'auth', found.id);
     this.showToast(`Xác thực thành công! Đã kích hoạt toàn quyền cho ${found.title} (${found.name}).`, 'success');
     this.notify();
 
@@ -3367,6 +3656,9 @@ class AppStateService {
             } catch (parseE) {}
           }
         }
+
+        // Luôn chuẩn hóa và bảo lưu Ban Cán Sự Lớp 10A16 chính xác theo yêu cầu
+        this.enforceOfficialOfficers();
 
         // Tự động tái tạo sơ đồ CHỈ KHI và CHỈ KHI hoàn toàn chưa có ghế nào
         if (!hasLoadedSeatsFromCloud && (!this.seats || this.seats.length === 0 || !this.seats.some(s => Boolean(s.student_id)))) {

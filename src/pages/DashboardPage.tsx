@@ -468,6 +468,47 @@ export const DashboardPage: React.FC<Props> = ({
             </div>
           </div>
 
+          {/* Các vai trò cán bộ mở rộng do GVCN tự do bổ sung */}
+          {appState.officerAccounts
+            .filter(
+              (a) =>
+                a.role !== 'gvcn' &&
+                a.id !== 'acc-lt-truong' &&
+                a.id !== 'acc-lp-kyluat' &&
+                a.id !== 'acc-lp-hoctap' &&
+                a.id !== 'acc-bt-chidoan' &&
+                !a.title.includes('Lớp trưởng') &&
+                !a.title.includes('Kỷ luật') &&
+                !a.title.includes('Học tập') &&
+                !a.title.includes('Bí thư')
+            )
+            .map((acc) => (
+              <div
+                key={acc.id}
+                className="p-5 bg-slate-50/90 rounded-2xl border-2 border-slate-200 flex flex-col justify-between shadow-xs"
+              >
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-black uppercase tracking-wider text-emerald-700">
+                      {acc.title}
+                    </span>
+                    <span className="text-xs font-black px-2.5 py-0.5 rounded-lg bg-emerald-100 text-emerald-800">
+                      {acc.badge || 'Ban Cán Sự'}
+                    </span>
+                  </div>
+                  <div className="font-black text-slate-900 text-lg sm:text-xl tracking-tight">
+                    {acc.name}
+                  </div>
+                  <p className="text-sm text-slate-600 mt-2 leading-relaxed">
+                    {acc.duties || 'Phụ trách công việc theo phân công của GVCN'}
+                  </p>
+                </div>
+                <div className="text-xs sm:text-sm text-slate-500 font-semibold mt-3 pt-2.5 border-t border-slate-200">
+                  Vai trò cán sự mở rộng do GVCN phân công
+                </div>
+              </div>
+            ))}
+
           {/* 4 Tổ trưởng */}
           <div className="p-5 bg-slate-50/90 rounded-2xl border-2 border-slate-200 flex flex-col justify-between shadow-xs">
             <div>

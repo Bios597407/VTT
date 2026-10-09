@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { appState, ClassInfo } from '../services/appStateService';
+import { appState, ClassInfo, OfficerAccount } from '../services/appStateService';
 import {
   GraduationCap,
   Users,
@@ -23,6 +23,8 @@ import {
   Save,
   RefreshCw,
   UserCheck,
+  Plus,
+  Trash2,
 } from 'lucide-react';
 import { NavTab } from '../components/Sidebar';
 
@@ -54,26 +56,29 @@ export const ClassManagementPage: React.FC<Props> = ({ onNavigate, onOpenAuthMod
   const [isEditingInfo, setIsEditingInfo] = useState(false);
   const [editForm, setEditForm] = useState<ClassInfo>({ ...classInfo });
 
-  // State: Modal 2 - Chỉ định Ban Cán Sự & Tổ trưởng (Toàn quyền thay đổi không hạn chế)
+  // State: Modal 2 - Quản lý Toàn bộ Vai trò Ban Cán Sự (GVCN chủ động đặt tên, nội dung & bổ sung)
   const [isEditingOfficers, setIsEditingOfficers] = useState(false);
-  const [isCustomPresident, setIsCustomPresident] = useState(false);
-  const [isCustomViceDiscipline, setIsCustomViceDiscipline] = useState(false);
-  const [isCustomViceAcademic, setIsCustomViceAcademic] = useState(false);
-  const [isCustomSecretary, setIsCustomSecretary] = useState(false);
-
-  const [officerForm, setOfficerForm] = useState({
-    gvcn_name: classInfo.gvcn_name,
-    class_president_name: classInfo.class_president_name,
-    class_vice_discipline_name: classInfo.class_vice_discipline_name,
-    class_vice_academic_name: classInfo.class_vice_academic_name,
-    secretary_name: classInfo.secretary_name,
-    group1_leader: groups.find((g) => g.group_number === 1)?.leader_student_id || '',
-    group2_leader: groups.find((g) => g.group_number === 2)?.leader_student_id || '',
-    group3_leader: groups.find((g) => g.group_number === 3)?.leader_student_id || '',
-    group4_leader: groups.find((g) => g.group_number === 4)?.leader_student_id || '',
+  const [officerList, setOfficerList] = useState<OfficerAccount[]>([]);
+  const [gvcnName, setGvcnName] = useState(classInfo.gvcn_name);
+  const [customNameMode, setCustomNameMode] = useState<Record<string, boolean>>({});
+  const [groupLeaders, setGroupLeaders] = useState<Record<number, string>>({
+    1: groups.find((g) => g.group_number === 1)?.leader_student_id || '',
+    2: groups.find((g) => g.group_number === 2)?.leader_student_id || '',
+    3: groups.find((g) => g.group_number === 3)?.leader_student_id || '',
+    4: groups.find((g) => g.group_number === 4)?.leader_student_id || '',
   });
 
-  // States related to officer management are now hosted solely in SettingsPage
+  // State: Modal 3 - Bổ sung nhanh vai trò mới
+  const [isAddRoleModal, setIsAddRoleModal] = useState(false);
+  const [newRoleForm, setNewRoleForm] = useState({
+    title: '',
+    name: '',
+    student_id: '',
+    duties: '',
+    badge: 'Ban Cán Sự',
+    pin: '',
+    isCustomName: false,
+  });
 
   const handleQuickGvcnLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -99,46 +104,158 @@ export const ClassManagementPage: React.FC<Props> = ({ onNavigate, onOpenAuthMod
   };
 
   const handleOpenEditOfficers = () => {
-    setOfficerForm({
-      gvcn_name: classInfo.gvcn_name,
-      class_president_name: classInfo.class_president_name,
-      class_vice_discipline_name: classInfo.class_vice_discipline_name,
-      class_vice_academic_name: classInfo.class_vice_academic_name,
-      secretary_name: classInfo.secretary_name,
-      group1_leader: groups.find((g) => g.group_number === 1)?.leader_student_id || '',
-      group2_leader: groups.find((g) => g.group_number === 2)?.leader_student_id || '',
-      group3_leader: groups.find((g) => g.group_number === 3)?.leader_student_id || '',
-      group4_leader: groups.find((g) => g.group_number === 4)?.leader_student_id || '',
+    setGvcnName(classInfo.gvcn_name);
+    const nonGvcn = officerAccounts
+      .filter((a) => a.role !== 'gvcn')
+      .map((a) => ({ ...a }));
+    setOfficerList(nonGvcn);
+
+    const modeMap: Record<string, boolean> = {};
+    nonGvcn.forEach((a) => {
+      const match = students.some((s) => s.full_name === a.name);
+      modeMap[a.id] = !match;
+    });
+    setCustomNameMode(modeMap);
+
+    setGroupLeaders({
+      1: groups.find((g) => g.group_number === 1)?.leader_student_id || '',
+      2: groups.find((g) => g.group_number === 2)?.leader_student_id || '',
+      3: groups.find((g) => g.group_number === 3)?.leader_student_id || '',
+      4: groups.find((g) => g.group_number === 4)?.leader_student_id || '',
     });
     setIsEditingOfficers(true);
   };
 
-  // Handlers related to officer management are now hosted solely in SettingsPage
+  const handleAddNewRoleToModalList = () => {
+    const newId = `acc-custom-${Date.now()}`;
+    const defaultStudent = students[0];
+    const newAcc: OfficerAccount = {
+      id: newId,
+      role: 'lop_pho',
+      title: 'Cán sự Lớp mới',
+      name: defaultStudent ? defaultStudent.full_name : 'Học sinh 10A16',
+      student_id: defaultStudent ? defaultStudent.id : undefined,
+      email: '',
+      pin: '10A16cs',
+      duties: 'Phụ trách công việc theo phân công của GVCN',
+      badge: 'Ban Cán Sự',
+      canManage: true,
+    };
+    setOfficerList([...officerList, newAcc]);
+    setCustomNameMode({ ...customNameMode, [newId]: false });
+  };
+
+  const handleRemoveRoleFromModalList = (id: string) => {
+    setOfficerList(officerList.filter((a) => a.id !== id));
+  };
+
+  const handleDeleteOfficer = (acc: OfficerAccount) => {
+    if (acc.role === 'gvcn') {
+      appState.showToast('Không thể xóa tài khoản Giáo viên Chủ nhiệm!', 'warn');
+      return;
+    }
+    if (window.confirm(`Thầy/Cô có chắc chắn muốn xóa vai trò [${acc.title}: ${acc.name}] không?`)) {
+      appState.deleteOfficerAccount(acc.id);
+      appState.showToast(`Đã xóa vai trò [${acc.title}] thành công!`, 'info');
+    }
+  };
+
+  const handleCreateNewRole = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newRoleForm.title.trim() || !newRoleForm.name.trim()) {
+      appState.showToast('Vui lòng nhập đầy đủ Tên chức danh và Họ tên cán sự!', 'warn');
+      return;
+    }
+    const newOfficer: OfficerAccount = {
+      id: `acc-custom-${Date.now()}`,
+      role: 'lop_pho',
+      title: newRoleForm.title.trim(),
+      name: newRoleForm.name.trim(),
+      student_id: newRoleForm.student_id || undefined,
+      email: '',
+      pin: newRoleForm.pin.trim() || '10A16cs',
+      duties: newRoleForm.duties.trim() || 'Thực hiện nhiệm vụ theo phân công của GVCN',
+      badge: newRoleForm.badge.trim() || 'Ban Cán Sự',
+      canManage: true,
+    };
+    appState.addOfficerAccount(newOfficer);
+    appState.showToast(`✅ Đã bổ sung vai trò mới [${newOfficer.title}: ${newOfficer.name}] thành công!`, 'success');
+    setIsAddRoleModal(false);
+    setNewRoleForm({
+      title: '',
+      name: '',
+      student_id: '',
+      duties: '',
+      badge: 'Ban Cán Sự',
+      pin: '',
+      isCustomName: false,
+    });
+  };
 
   const handleSaveOfficers = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // 1. Cập nhật thông tin Ban Cán sự & GVCN
+    // 1. Cập nhật GVCN
+    const gvcnAcc = officerAccounts.find((a) => a.role === 'gvcn');
+    if (gvcnAcc && gvcnName.trim()) {
+      appState.updateOfficerAccount(gvcnAcc.id, { name: gvcnName.trim() });
+    }
+
+    // 2. Cập nhật từng vai trò trong officerList
+    let presName = classInfo.class_president_name;
+    let viceDiscName = classInfo.class_vice_discipline_name;
+    let viceAcadName = classInfo.class_vice_academic_name;
+    let secName = classInfo.secretary_name;
+
+    for (const off of officerList) {
+      const existing = officerAccounts.find((a) => a.id === off.id);
+      if (existing) {
+        appState.updateOfficerAccount(off.id, {
+          title: off.title.trim(),
+          name: off.name.trim(),
+          student_id: off.student_id,
+          duties: off.duties?.trim(),
+          badge: off.badge?.trim(),
+          pin: off.pin?.trim() || existing.pin,
+        });
+      } else {
+        appState.addOfficerAccount(off);
+      }
+
+      if (off.id === 'acc-lt-truong' || off.role === 'lop_truong' || off.title.includes('Lớp trưởng')) {
+        presName = off.name.trim();
+      } else if (off.id === 'acc-lp-kyluat' || off.title.includes('Kỷ luật')) {
+        viceDiscName = off.name.trim();
+      } else if (off.id === 'acc-lp-hoctap' || off.id === 'acc-lt' || off.title.includes('Học tập')) {
+        viceAcadName = off.name.trim();
+      } else if (off.id === 'acc-bt-chidoan' || off.id === 'acc-lp' || off.title.includes('Bí thư')) {
+        secName = off.name.trim();
+      }
+    }
+
+    // Xóa những tài khoản đã bị gỡ khỏi danh sách trong modal (ngoại trừ GVCN)
+    for (const cur of officerAccounts) {
+      if (cur.role !== 'gvcn' && !officerList.some((o) => o.id === cur.id)) {
+        appState.deleteOfficerAccount(cur.id);
+      }
+    }
+
+    // 3. Đồng bộ vào classInfo
     await appState.updateClassInfo({
-      gvcn_name: officerForm.gvcn_name.trim(),
-      class_president_name: officerForm.class_president_name.trim(),
-      class_vice_discipline_name: officerForm.class_vice_discipline_name.trim(),
-      class_vice_academic_name: officerForm.class_vice_academic_name.trim(),
-      secretary_name: officerForm.secretary_name.trim(),
+      gvcn_name: gvcnName.trim(),
+      class_president_name: presName,
+      class_vice_discipline_name: viceDiscName,
+      class_vice_academic_name: viceAcadName,
+      secretary_name: secName,
     });
 
-    // 2. Cập nhật 4 Tổ trưởng tổ tự quản
-    const g1 = groups.find((g) => g.group_number === 1);
-    if (g1) await appState.updateGroupLeader(g1.id, officerForm.group1_leader);
-
-    const g2 = groups.find((g) => g.group_number === 2);
-    if (g2) await appState.updateGroupLeader(g2.id, officerForm.group2_leader);
-
-    const g3 = groups.find((g) => g.group_number === 3);
-    if (g3) await appState.updateGroupLeader(g3.id, officerForm.group3_leader);
-
-    const g4 = groups.find((g) => g.group_number === 4);
-    if (g4) await appState.updateGroupLeader(g4.id, officerForm.group4_leader);
+    // 4. Cập nhật 4 Tổ trưởng tổ tự quản
+    for (let i = 1; i <= 4; i++) {
+      const grp = groups.find((g) => g.group_number === i);
+      if (grp) {
+        await appState.updateGroupLeader(grp.id, groupLeaders[i] || '');
+      }
+    }
 
     appState.showToast('✅ Đã lưu và đồng bộ toàn quyền Ban Cán Sự Lớp 10A16 lên hệ thống!', 'success');
     setIsEditingOfficers(false);
@@ -364,22 +481,35 @@ export const ClassManagementPage: React.FC<Props> = ({ onNavigate, onOpenAuthMod
           {/* Officers & Accounts Management has been successfully moved back to SettingsPage.tsx under Cài đặt & Cơ sở dữ liệu */}
         </div>
 
-        {/* Right Column: Class Officers Card (Ban Cán Sự) */}
+        {/* Right Column: Class Officers Card (Ban Cán Sự & Đội ngũ Cán bộ) */}
         <div className="space-y-5">
           <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div className="flex items-center gap-2">
                 <ShieldCheck className="w-5 h-5 text-emerald-600" />
-                <h3 className="font-bold text-sm text-slate-900">Ban Cán Sự Lớp 10A16</h3>
+                <div>
+                  <h3 className="font-bold text-sm text-slate-900">Ban Cán Sự & Cán Bộ Lớp 10A16</h3>
+                  <p className="text-[11px] text-slate-500 font-normal">GVCN chủ động đặt tên vai trò, ghi nội dung & bổ sung</p>
+                </div>
               </div>
               {canManageClass && (
-                <button
-                  onClick={handleOpenEditOfficers}
-                  className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1 cursor-pointer"
-                >
-                  <Edit3 className="w-3.5 h-3.5" />
-                  <span>Chỉ định</span>
-                </button>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => setIsAddRoleModal(true)}
+                    className="text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1.5 rounded-xl border border-emerald-200 flex items-center gap-1 cursor-pointer transition"
+                    title="Bổ sung thêm chức danh mới"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Thêm vai trò</span>
+                  </button>
+                  <button
+                    onClick={handleOpenEditOfficers}
+                    className="text-xs font-bold text-blue-600 hover:text-white bg-blue-50 hover:bg-blue-600 px-2.5 py-1.5 rounded-xl border border-blue-200 flex items-center gap-1 cursor-pointer transition"
+                  >
+                    <Edit3 className="w-3.5 h-3.5" />
+                    <span>Quản lý</span>
+                  </button>
+                </div>
               )}
             </div>
 
@@ -395,80 +525,101 @@ export const ClassManagementPage: React.FC<Props> = ({ onNavigate, onOpenAuthMod
                     <School className="w-4 h-4 text-blue-600 shrink-0" />
                     <span>{classInfo.room_number} · THPT Võ Trường Toản</span>
                   </div>
+                  <div className="text-xs text-blue-800 font-semibold mt-1">
+                    Chỉ đạo toàn diện nề nếp & giáo dục toàn lớp
+                  </div>
                 </div>
-                <span className="px-3 py-1 text-xs font-black bg-blue-600 text-white rounded-xl shadow-xs">
+                <span className="px-3 py-1 text-xs font-black bg-blue-600 text-white rounded-xl shadow-xs shrink-0">
                   Toàn quyền
                 </span>
               </div>
 
-              {/* Lớp trưởng */}
-              <div className="p-4 bg-slate-50/90 rounded-2xl border-2 border-slate-200 flex items-center justify-between">
-                <div>
-                  <div className="text-xs font-black uppercase tracking-wider text-slate-600">
-                    Lớp trưởng
-                  </div>
-                  <div className="font-black text-slate-900 text-base sm:text-lg mt-1">
-                    {classInfo.class_president_name}
-                  </div>
-                  <div className="text-xs text-slate-500 font-medium mt-0.5">Phụ trách điều hành chung toàn lớp</div>
-                </div>
-                <span className="px-2.5 py-1 text-xs font-black bg-emerald-100 text-emerald-800 rounded-lg">
-                  Ban Cán Sự
-                </span>
-              </div>
+              {/* Dynamic Officer List from officerAccounts (Lớp trưởng, Lớp phó, and all custom roles!) */}
+              {officerAccounts
+                .filter((a) => a.role !== 'gvcn')
+                .map((acc) => {
+                  const isLt = acc.title.includes('Lớp trưởng') || acc.role === 'lop_truong';
+                  const isKl = acc.title.includes('Kỷ luật');
+                  const isHt = acc.title.includes('Học tập');
+                  const isBt = acc.title.includes('Bí thư');
 
-              {/* Lớp phó Kỷ luật */}
-              <div className="p-4 bg-slate-50/90 rounded-2xl border-2 border-slate-200 flex items-center justify-between">
-                <div>
-                  <div className="text-xs font-black uppercase tracking-wider text-rose-700">
-                    Lớp phó Kỷ luật & Nề nếp
-                  </div>
-                  <div className="font-black text-slate-900 text-base sm:text-lg mt-1">
-                    {classInfo.class_vice_discipline_name}
-                  </div>
-                  <div className="text-xs text-slate-500 font-medium mt-0.5">Quản lý vi phạm & chấm điểm nề nếp</div>
-                </div>
-                <span className="px-2.5 py-1 text-xs font-black bg-emerald-100 text-emerald-800 rounded-lg">
-                  Ban Cán Sự
-                </span>
-              </div>
+                  return (
+                    <div
+                      key={acc.id}
+                      className="p-4 bg-slate-50/90 rounded-2xl border-2 border-slate-200 flex items-start justify-between gap-3 group hover:border-slate-300 transition"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span
+                            className={`text-xs font-black uppercase tracking-wider ${
+                              isLt
+                                ? 'text-slate-800'
+                                : isKl
+                                ? 'text-rose-700'
+                                : isHt
+                                ? 'text-indigo-700'
+                                : isBt
+                                ? 'text-amber-800'
+                                : 'text-emerald-700'
+                            }`}
+                          >
+                            {acc.title}
+                          </span>
+                          <span
+                            className={`text-[10px] font-black px-2 py-0.5 rounded-md ${
+                              isLt || isKl
+                                ? 'bg-emerald-100 text-emerald-800'
+                                : isHt
+                                ? 'bg-indigo-50 text-indigo-800'
+                                : isBt
+                                ? 'bg-amber-50 text-amber-800'
+                                : 'bg-slate-200 text-slate-800'
+                            }`}
+                          >
+                            {acc.badge || 'Ban Cán Sự'}
+                          </span>
+                        </div>
+                        <div className="font-black text-slate-900 text-base sm:text-lg mt-1 truncate">
+                          {acc.name}
+                        </div>
+                        <div className="text-xs text-slate-600 font-medium mt-1 leading-relaxed">
+                          {acc.duties || 'Phụ trách công việc theo phân công của GVCN'}
+                        </div>
+                      </div>
 
-              {/* Lớp phó Học tập */}
-              <div className="p-4 bg-slate-50/90 rounded-2xl border-2 border-slate-200 flex items-center justify-between">
-                <div>
-                  <div className="text-xs font-black uppercase tracking-wider text-indigo-700">
-                    Lớp phó Học tập
-                  </div>
-                  <div className="font-black text-slate-900 text-base sm:text-lg mt-1">
-                    {classInfo.class_vice_academic_name}
-                  </div>
-                  <div className="text-xs text-slate-500 font-medium mt-0.5">Theo dõi học vụ & sổ đầu bài</div>
-                </div>
-                <span className="px-2.5 py-1 text-xs font-black bg-indigo-50 text-indigo-800 rounded-lg">
-                  Học vụ
-                </span>
-              </div>
+                      <div className="flex items-center gap-1 shrink-0 pt-0.5">
+                        {canManageClass && (
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteOfficer(acc)}
+                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition cursor-pointer"
+                            title={`Xóa vai trò [${acc.title}]`}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
 
-              {/* Bí thư */}
-              <div className="p-4 bg-slate-50/90 rounded-2xl border-2 border-slate-200 flex items-center justify-between">
-                <div>
-                  <div className="text-xs font-black uppercase tracking-wider text-amber-800">
-                    Bí thư Chi đoàn
-                  </div>
-                  <div className="font-black text-slate-900 text-base sm:text-lg mt-1">
-                    {classInfo.secretary_name}
-                  </div>
-                  <div className="text-xs text-slate-500 font-medium mt-0.5">Phong trào Đoàn thanh niên</div>
-                </div>
-                <span className="px-2.5 py-1 text-xs font-black bg-amber-50 text-amber-800 rounded-lg">
-                  Đoàn TN
-                </span>
-              </div>
+              {/* Nút Bổ sung Vai trò Cán bộ Mới */}
+              {canManageClass && (
+                <button
+                  type="button"
+                  onClick={() => setIsAddRoleModal(true)}
+                  className="w-full py-3 px-4 border-2 border-dashed border-blue-300 hover:border-blue-500 hover:bg-blue-50/40 rounded-2xl text-blue-700 font-bold text-xs flex items-center justify-center gap-2 transition cursor-pointer active:scale-98"
+                >
+                  <Plus className="w-4 h-4 text-blue-600" />
+                  <span>+ Bổ sung Vai trò Cán bộ Mới (Thủ quỹ, Lớp phó Lao động, Cán sự bộ môn...)</span>
+                </button>
+              )}
 
               {/* 4 Tổ trưởng */}
               <div className="p-4 bg-slate-50/90 rounded-2xl border-2 border-slate-200 space-y-2">
-                <div className="text-xs font-black uppercase tracking-wider text-slate-700 mb-1">
-                  4 Tổ trưởng Tự quản:
+                <div className="text-xs font-black uppercase tracking-wider text-slate-700 mb-1 flex items-center justify-between">
+                  <span>4 Tổ trưởng Tự quản:</span>
+                  <span className="text-[10px] text-slate-500 font-normal">Chấm chéo & Báo cáo</span>
                 </div>
                 {groups.map((g) => {
                   const leader = students.find((s) => s.id === g.leader_student_id);
@@ -649,167 +800,195 @@ export const ClassManagementPage: React.FC<Props> = ({ onNavigate, onOpenAuthMod
                   <input
                     type="text"
                     required
-                    value={officerForm.gvcn_name}
-                    onChange={(e) => setOfficerForm({ ...officerForm, gvcn_name: e.target.value })}
-                    className="w-full p-3 border-2 rounded-xl bg-white border-slate-300 text-base font-black text-slate-900"
+                    value={gvcnName}
+                    onChange={(e) => setGvcnName(e.target.value)}
+                    className="w-full p-3 border-2 rounded-xl bg-white border-slate-300 text-base font-black text-slate-900 focus:border-blue-500 focus:outline-hidden"
                   />
                 </div>
               </div>
 
-              {/* PHẦN 2: BAN CÁN SỰ (CHỌN TỪ DANH SÁCH HOẶC GÕ TỰ DO KHÔNG HẠN CHẾ) */}
+              {/* PHẦN 2: BAN CÁN SỰ & ĐỘI NGŨ CÁN BỘ (KHÔNG KHOÁ CỨNG, GVCN CHỦ ĐỘNG GHI NỘI DUNG & BỔ SUNG) */}
               <div className="space-y-3">
-                <div className="font-black text-xs text-slate-900 flex items-center justify-between border-b border-slate-100 pb-1.5">
+                <div className="font-black text-xs text-slate-900 flex items-center justify-between border-b border-slate-100 pb-2">
                   <div className="flex items-center gap-1.5">
                     <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                    <span>2. Ban Cán Sự Lớp 10A16 (Toàn quyền chọn hoặc tự gõ tên):</span>
+                    <span>2. Ban Cán Sự & Cán Bộ Lớp 10A16 ({officerList.length} chức danh):</span>
                   </div>
-                  <span className="text-[10px] text-slate-500 font-normal">
-                    Thầy/cô có thể chọn từ 43 học sinh hoặc tự do gõ tên bất kỳ
-                  </span>
+                  <button
+                    type="button"
+                    onClick={handleAddNewRoleToModalList}
+                    className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-bold text-[11px] shadow-xs flex items-center gap-1 cursor-pointer transition active:scale-95"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>+ Thêm vai trò mới</span>
+                  </button>
                 </div>
 
-                {/* Lớp trưởng */}
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between">
-                    <label className="font-bold text-slate-800">Lớp trưởng (Điều hành chung toàn lớp):</label>
-                    <button
-                      type="button"
-                      onClick={() => setIsCustomPresident(!isCustomPresident)}
-                      className="text-[10px] font-bold text-blue-600 hover:underline cursor-pointer"
-                    >
-                      {isCustomPresident ? '↩ Chọn từ danh sách' : '✏️ Tự gõ họ tên tự do'}
-                    </button>
-                  </div>
-                  {isCustomPresident ? (
-                    <input
-                      type="text"
-                      required
-                      value={officerForm.class_president_name}
-                      onChange={(e) => setOfficerForm({ ...officerForm, class_president_name: e.target.value })}
-                      placeholder="Nhập họ và tên Lớp trưởng tự do..."
-                      className="w-full p-2.5 border rounded-xl border-blue-400 bg-blue-50/20 font-bold"
-                    />
-                  ) : (
-                    <select
-                      value={officerForm.class_president_name}
-                      onChange={(e) => setOfficerForm({ ...officerForm, class_president_name: e.target.value })}
-                      className="w-full p-2.5 border rounded-xl border-slate-300 bg-white font-medium"
-                    >
-                      {students.map((s) => (
-                        <option key={s.id} value={s.full_name}>
-                          {s.student_code} - {s.full_name}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                </div>
+                <p className="text-[11px] text-slate-500 leading-relaxed">
+                  💡 Thầy/Cô có toàn quyền chủ động đặt tên chức danh, ghi nội dung nhiệm vụ và bổ sung thêm các vai trò mới (Thủ quỹ, Lớp phó Lao động, Cán sự Văn thể mỹ...) không bị hạn chế.
+                </p>
 
-                {/* Lớp phó Kỷ luật */}
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between">
-                    <label className="font-bold text-slate-800">Lớp phó Kỷ luật & Nề nếp (Quản lý vi phạm & chấm điểm):</label>
-                    <button
-                      type="button"
-                      onClick={() => setIsCustomViceDiscipline(!isCustomViceDiscipline)}
-                      className="text-[10px] font-bold text-blue-600 hover:underline cursor-pointer"
-                    >
-                      {isCustomViceDiscipline ? '↩ Chọn từ danh sách' : '✏️ Tự gõ họ tên tự do'}
-                    </button>
-                  </div>
-                  {isCustomViceDiscipline ? (
-                    <input
-                      type="text"
-                      required
-                      value={officerForm.class_vice_discipline_name}
-                      onChange={(e) => setOfficerForm({ ...officerForm, class_vice_discipline_name: e.target.value })}
-                      placeholder="Nhập họ và tên Lớp phó Kỷ luật tự do..."
-                      className="w-full p-2.5 border rounded-xl border-rose-400 bg-rose-50/20 font-bold"
-                    />
-                  ) : (
-                    <select
-                      value={officerForm.class_vice_discipline_name}
-                      onChange={(e) => setOfficerForm({ ...officerForm, class_vice_discipline_name: e.target.value })}
-                      className="w-full p-2.5 border rounded-xl border-slate-300 bg-white font-medium"
-                    >
-                      {students.map((s) => (
-                        <option key={s.id} value={s.full_name}>
-                          {s.student_code} - {s.full_name}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                </div>
+                <div className="space-y-3">
+                  {officerList.map((off, idx) => {
+                    const isCustom = customNameMode[off.id];
 
-                {/* Lớp phó Học tập */}
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between">
-                    <label className="font-bold text-slate-800">Lớp phó Học tập (Học vụ & Bài vở):</label>
-                    <button
-                      type="button"
-                      onClick={() => setIsCustomViceAcademic(!isCustomViceAcademic)}
-                      className="text-[10px] font-bold text-blue-600 hover:underline cursor-pointer"
-                    >
-                      {isCustomViceAcademic ? '↩ Chọn từ danh sách' : '✏️ Tự gõ họ tên tự do'}
-                    </button>
-                  </div>
-                  {isCustomViceAcademic ? (
-                    <input
-                      type="text"
-                      required
-                      value={officerForm.class_vice_academic_name}
-                      onChange={(e) => setOfficerForm({ ...officerForm, class_vice_academic_name: e.target.value })}
-                      placeholder="Nhập họ và tên Lớp phó Học tập tự do..."
-                      className="w-full p-2.5 border rounded-xl border-indigo-400 bg-indigo-50/20 font-bold"
-                    />
-                  ) : (
-                    <select
-                      value={officerForm.class_vice_academic_name}
-                      onChange={(e) => setOfficerForm({ ...officerForm, class_vice_academic_name: e.target.value })}
-                      className="w-full p-2.5 border rounded-xl border-slate-300 bg-white font-medium"
-                    >
-                      {students.map((s) => (
-                        <option key={s.id} value={s.full_name}>
-                          {s.student_code} - {s.full_name}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                </div>
+                    return (
+                      <div
+                        key={off.id}
+                        className="p-3.5 bg-slate-50 rounded-2xl border-2 border-slate-200 hover:border-blue-300 transition space-y-3"
+                      >
+                        <div className="flex items-center justify-between gap-2 border-b border-slate-200/80 pb-2">
+                          <span className="font-black text-xs text-blue-900">
+                            #{idx + 1}. Vai trò / Chức danh:
+                          </span>
+                          {officerList.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveRoleFromModalList(off.id)}
+                              className="text-rose-600 hover:bg-rose-50 p-1 rounded-md text-[11px] font-bold flex items-center gap-1 cursor-pointer transition"
+                              title="Xóa vai trò này"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              <span>Xóa</span>
+                            </button>
+                          )}
+                        </div>
 
-                {/* Bí thư Chi đoàn */}
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between">
-                    <label className="font-bold text-slate-800">Bí thư Chi đoàn (Phong trào thanh niên):</label>
-                    <button
-                      type="button"
-                      onClick={() => setIsCustomSecretary(!isCustomSecretary)}
-                      className="text-[10px] font-bold text-blue-600 hover:underline cursor-pointer"
-                    >
-                      {isCustomSecretary ? '↩ Chọn từ danh sách' : '✏️ Tự gõ họ tên tự do'}
-                    </button>
-                  </div>
-                  {isCustomSecretary ? (
-                    <input
-                      type="text"
-                      required
-                      value={officerForm.secretary_name}
-                      onChange={(e) => setOfficerForm({ ...officerForm, secretary_name: e.target.value })}
-                      placeholder="Nhập họ và tên Bí thư tự do..."
-                      className="w-full p-2.5 border rounded-xl border-amber-400 bg-amber-50/20 font-bold"
-                    />
-                  ) : (
-                    <select
-                      value={officerForm.secretary_name}
-                      onChange={(e) => setOfficerForm({ ...officerForm, secretary_name: e.target.value })}
-                      className="w-full p-2.5 border rounded-xl border-slate-300 bg-white font-medium"
-                    >
-                      {students.map((s) => (
-                        <option key={s.id} value={s.full_name}>
-                          {s.student_code} - {s.full_name}
-                        </option>
-                      ))}
-                    </select>
-                  )}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                          {/* Tên vai trò / Chức danh do GVCN chủ động ghi */}
+                          <div>
+                            <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                              Tên vai trò / Chức danh (GVCN tự do ghi):
+                            </label>
+                            <input
+                              type="text"
+                              required
+                              value={off.title}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setOfficerList(
+                                  officerList.map((o) => (o.id === off.id ? { ...o, title: val } : o))
+                                );
+                              }}
+                              placeholder="VD: Lớp trưởng, Lớp phó Kỷ luật, Thủ quỹ..."
+                              className="w-full p-2.5 border-2 rounded-xl bg-white border-slate-300 text-xs font-black text-slate-900 focus:border-blue-500 focus:outline-hidden"
+                            />
+                          </div>
+
+                          {/* Người đảm nhận */}
+                          <div>
+                            <div className="flex items-center justify-between mb-1">
+                              <label className="text-[11px] font-bold text-slate-700">Người đảm nhận:</label>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setCustomNameMode({ ...customNameMode, [off.id]: !isCustom })
+                                }
+                                className="text-[10px] font-bold text-blue-600 hover:underline cursor-pointer"
+                              >
+                                {isCustom ? '↩ Chọn danh sách 43 HS' : '✏️ Tự gõ họ tên'}
+                              </button>
+                            </div>
+
+                            {isCustom ? (
+                              <input
+                                type="text"
+                                required
+                                value={off.name}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setOfficerList(
+                                    officerList.map((o) => (o.id === off.id ? { ...o, name: val } : o))
+                                  );
+                                }}
+                                placeholder="Nhập họ và tên cán sự tự do..."
+                                className="w-full p-2.5 border rounded-xl border-blue-400 bg-blue-50/20 font-bold text-xs"
+                              />
+                            ) : (
+                              <select
+                                value={off.name}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  const stu = students.find((s) => s.full_name === val);
+                                  setOfficerList(
+                                    officerList.map((o) =>
+                                      o.id === off.id
+                                        ? { ...o, name: val, student_id: stu?.id }
+                                        : o
+                                    )
+                                  );
+                                }}
+                                className="w-full p-2.5 border rounded-xl border-slate-300 bg-white font-medium text-xs"
+                              >
+                                {students.map((s) => (
+                                  <option key={s.id} value={s.full_name}>
+                                    {s.student_code} - {s.full_name}
+                                  </option>
+                                ))}
+                              </select>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Nội dung vai trò & Phân công nhiệm vụ do GVCN ghi */}
+                        <div>
+                          <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                            Nội dung vai trò & Nhiệm vụ được phân công (GVCN chủ động ghi nội dung):
+                          </label>
+                          <input
+                            type="text"
+                            value={off.duties || ''}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setOfficerList(
+                                officerList.map((o) => (o.id === off.id ? { ...o, duties: val } : o))
+                              );
+                            }}
+                            placeholder="VD: Điều hành chung toàn lớp, ghi nhận vi phạm, quản lý quỹ..."
+                            className="w-full p-2 border rounded-xl bg-white border-slate-300 text-xs text-slate-800"
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2.5 pt-1">
+                          <div>
+                            <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">
+                              Nhãn phân loại (Badge):
+                            </label>
+                            <input
+                              type="text"
+                              value={off.badge || 'Ban Cán Sự'}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setOfficerList(
+                                  officerList.map((o) => (o.id === off.id ? { ...o, badge: val } : o))
+                                );
+                              }}
+                              placeholder="VD: Ban Cán Sự, Học vụ, Đoàn TN, Đời sống..."
+                              className="w-full p-2 border rounded-xl bg-white border-slate-300 text-xs font-medium"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">
+                              Mã PIN cán sự:
+                            </label>
+                            <input
+                              type="text"
+                              value={off.pin || ''}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setOfficerList(
+                                  officerList.map((o) => (o.id === off.id ? { ...o, pin: val } : o))
+                                );
+                              }}
+                              placeholder="VD: 10A16cs"
+                              className="w-full p-2 border rounded-xl bg-white border-slate-300 text-xs font-mono"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -823,8 +1002,8 @@ export const ClassManagementPage: React.FC<Props> = ({ onNavigate, onOpenAuthMod
                   <div>
                     <label className="block text-[11px] font-bold text-slate-700 mb-0.5">Tổ trưởng Tổ 1:</label>
                     <select
-                      value={officerForm.group1_leader}
-                      onChange={(e) => setOfficerForm({ ...officerForm, group1_leader: e.target.value })}
+                      value={groupLeaders[1]}
+                      onChange={(e) => setGroupLeaders({ ...groupLeaders, 1: e.target.value })}
                       className="w-full p-2 border rounded-xl border-slate-300 bg-white"
                     >
                       <option value="">-- Chưa gán --</option>
@@ -839,8 +1018,8 @@ export const ClassManagementPage: React.FC<Props> = ({ onNavigate, onOpenAuthMod
                   <div>
                     <label className="block text-[11px] font-bold text-slate-700 mb-0.5">Tổ trưởng Tổ 2:</label>
                     <select
-                      value={officerForm.group2_leader}
-                      onChange={(e) => setOfficerForm({ ...officerForm, group2_leader: e.target.value })}
+                      value={groupLeaders[2]}
+                      onChange={(e) => setGroupLeaders({ ...groupLeaders, 2: e.target.value })}
                       className="w-full p-2 border rounded-xl border-slate-300 bg-white"
                     >
                       <option value="">-- Chưa gán --</option>
@@ -855,8 +1034,8 @@ export const ClassManagementPage: React.FC<Props> = ({ onNavigate, onOpenAuthMod
                   <div>
                     <label className="block text-[11px] font-bold text-slate-700 mb-0.5">Tổ trưởng Tổ 3:</label>
                     <select
-                      value={officerForm.group3_leader}
-                      onChange={(e) => setOfficerForm({ ...officerForm, group3_leader: e.target.value })}
+                      value={groupLeaders[3]}
+                      onChange={(e) => setGroupLeaders({ ...groupLeaders, 3: e.target.value })}
                       className="w-full p-2 border rounded-xl border-slate-300 bg-white"
                     >
                       <option value="">-- Chưa gán --</option>
@@ -871,8 +1050,8 @@ export const ClassManagementPage: React.FC<Props> = ({ onNavigate, onOpenAuthMod
                   <div>
                     <label className="block text-[11px] font-bold text-slate-700 mb-0.5">Tổ trưởng Tổ 4:</label>
                     <select
-                      value={officerForm.group4_leader}
-                      onChange={(e) => setOfficerForm({ ...officerForm, group4_leader: e.target.value })}
+                      value={groupLeaders[4]}
+                      onChange={(e) => setGroupLeaders({ ...groupLeaders, 4: e.target.value })}
                       className="w-full p-2 border rounded-xl border-slate-300 bg-white"
                     >
                       <option value="">-- Chưa gán --</option>
@@ -912,7 +1091,151 @@ export const ClassManagementPage: React.FC<Props> = ({ onNavigate, onOpenAuthMod
         </div>
       )}
 
-      {/* Modal 3 has been deprecated and merged into the main inline human resources section */}
+      {/* Modal 3: Bổ sung nhanh vai trò mới (GVCN toàn quyền thêm chức danh, đặt tên & ghi nội dung) */}
+      {isAddRoleModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden border border-slate-200">
+            <div className="px-5 py-4 bg-slate-900 text-white flex items-center justify-between">
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-bold text-base">Bổ sung Vai trò Cán bộ Mới</h3>
+                  <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-emerald-500 text-slate-950">
+                    GVCN chủ động
+                  </span>
+                </div>
+                <p className="text-xs text-slate-300 mt-0.5">
+                  Không khóa cứng vai trò • GVCN tự do đặt tên chức danh & phân công nội dung
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsAddRoleModal(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateNewRole} className="p-5 space-y-3.5 text-xs">
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">
+                  1. Tên vai trò / Chức danh mới (GVCN tự do đặt tên):
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={newRoleForm.title}
+                  onChange={(e) => setNewRoleForm({ ...newRoleForm, title: e.target.value })}
+                  placeholder="VD: Thủ quỹ lớp, Lớp phó Lao động, Cán sự Văn thể mỹ, Cán sự Tin học..."
+                  className="w-full p-2.5 border-2 rounded-xl bg-white border-slate-300 text-xs font-bold text-slate-900 focus:border-blue-500 focus:outline-hidden"
+                />
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="font-bold text-slate-700">2. Học sinh đảm nhận:</label>
+                  <button
+                    type="button"
+                    onClick={() => setNewRoleForm({ ...newRoleForm, isCustomName: !newRoleForm.isCustomName })}
+                    className="text-[10px] font-bold text-blue-600 hover:underline cursor-pointer"
+                  >
+                    {newRoleForm.isCustomName ? '↩ Chọn danh sách 43 HS' : '✏️ Tự gõ họ tên'}
+                  </button>
+                </div>
+                {newRoleForm.isCustomName ? (
+                  <input
+                    type="text"
+                    required
+                    value={newRoleForm.name}
+                    onChange={(e) => setNewRoleForm({ ...newRoleForm, name: e.target.value })}
+                    placeholder="Nhập họ và tên học sinh đảm nhận..."
+                    className="w-full p-2.5 border-2 rounded-xl border-blue-400 bg-blue-50/20 font-bold text-xs"
+                  />
+                ) : (
+                  <select
+                    value={newRoleForm.name}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      const stu = students.find((s) => s.full_name === val);
+                      setNewRoleForm({
+                        ...newRoleForm,
+                        name: val,
+                        student_id: stu?.id || '',
+                      });
+                    }}
+                    className="w-full p-2.5 border rounded-xl border-slate-300 bg-white font-medium text-xs"
+                  >
+                    <option value="">-- Chọn học sinh từ danh sách Lớp 10A16 --</option>
+                    {students.map((s) => (
+                      <option key={s.id} value={s.full_name}>
+                        {s.student_code} - {s.full_name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">
+                  3. Nội dung vai trò & Phân công nhiệm vụ (GVCN chủ động ghi nội dung):
+                </label>
+                <textarea
+                  rows={2}
+                  value={newRoleForm.duties}
+                  onChange={(e) => setNewRoleForm({ ...newRoleForm, duties: e.target.value })}
+                  placeholder="VD: Quản lý thu chi quỹ lớp công khai minh bạch, đôn đốc lao động vệ sinh phòng học..."
+                  className="w-full p-2.5 border rounded-xl bg-white border-slate-300 text-xs"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-slate-600 mb-1">
+                    Nhãn phân loại (Badge):
+                  </label>
+                  <input
+                    type="text"
+                    value={newRoleForm.badge}
+                    onChange={(e) => setNewRoleForm({ ...newRoleForm, badge: e.target.value })}
+                    placeholder="VD: Ban Cán Sự, Đời sống, Lao động..."
+                    className="w-full p-2 border rounded-xl border-slate-300 text-xs"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-600 mb-1">
+                    Mã PIN cán sự (Tùy chọn):
+                  </label>
+                  <input
+                    type="text"
+                    value={newRoleForm.pin}
+                    onChange={(e) => setNewRoleForm({ ...newRoleForm, pin: e.target.value })}
+                    placeholder="Mặc định: 10A16cs"
+                    className="w-full p-2 border rounded-xl border-slate-300 text-xs font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-3 flex items-center justify-end gap-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsAddRoleModal(false)}
+                  className="px-3.5 py-2 text-slate-600 hover:bg-slate-100 rounded-xl cursor-pointer"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl shadow-xs transition active:scale-95 cursor-pointer flex items-center gap-1.5"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Bổ sung vai trò</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
