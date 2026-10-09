@@ -30,7 +30,7 @@ export const SecurityCenterModal: React.FC<Props> = ({ isOpen, onClose }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'change_pin' | 'audit_logs' | 'sessions'>('overview');
 
   // Change PIN state
-  const [pinRole, setPinRole] = useState<'gvcn' | 'lop_truong' | 'lop_pho'>('gvcn');
+  const [pinAccountId, setPinAccountId] = useState<string>('acc-gvcn-user');
   const [oldPin, setOldPin] = useState('');
   const [newPin, setNewPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
@@ -59,7 +59,7 @@ export const SecurityCenterModal: React.FC<Props> = ({ isOpen, onClose }) => {
       return;
     }
 
-    const res = appState.changeOfficerPin(pinRole, oldPin, newPin);
+    const res = appState.changeOfficerPin(pinAccountId, oldPin, newPin);
     if (res.success) {
       setPinMsg({ type: 'success', text: res.message });
       setOldPin('');
@@ -320,13 +320,15 @@ export const SecurityCenterModal: React.FC<Props> = ({ isOpen, onClose }) => {
                 <div>
                   <label className="block text-xs font-semibold text-slate-300 mb-1">Chọn vai trò cần đổi PIN:</label>
                   <select
-                    value={pinRole}
-                    onChange={(e: any) => setPinRole(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm focus:outline-none focus:border-emerald-500"
+                    value={pinAccountId}
+                    onChange={(e: any) => setPinAccountId(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm focus:outline-none focus:border-emerald-500 font-semibold"
                   >
-                    <option value="gvcn">Giáo viên Chủ nhiệm (GVCN)</option>
-                    <option value="lop_truong">Lớp phó Học tập</option>
-                    <option value="lop_pho">Bí thư Chi đoàn</option>
+                    <option value="acc-gvcn-user">Giáo viên Chủ nhiệm (Thầy Trần Duy Tân)</option>
+                    <option value="acc-lt-truong">Lớp trưởng (Hoàng Trọng Minh)</option>
+                    <option value="acc-lp-kyluat">Lớp phó Kỷ luật & Nề nếp (Nguyễn Gia Bảo)</option>
+                    <option value="acc-lp-hoctap">Lớp phó Học tập (Nguyễn Ngọc Gia Hân)</option>
+                    <option value="acc-bt-chidoan">Bí thư Chi đoàn (Lưu Ngọc Linh)</option>
                   </select>
                 </div>
 

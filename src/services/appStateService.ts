@@ -298,17 +298,19 @@ class AppStateService {
   public lockoutUntil: Record<string, number> = {};
   public sessionTimeoutMinutes: number = 15;
 
-  public changeOfficerPin(role: 'gvcn' | 'lop_truong' | 'lop_pho', oldPin: string, newPin: string): { success: boolean; message: string } {
-    const acc = this.officerAccounts.find((a) => a.role === role);
+  public changeOfficerPin(accountId: string, oldPin: string, newPin: string): { success: boolean; message: string } {
+    const acc = this.officerAccounts.find((a) => a.id === accountId);
     if (!acc) return { success: false, message: 'Không tìm thấy tài khoản cán sự.' };
 
     const officialPins: Record<string, string> = {
-      gvcn: '1016',
-      lop_truong: '10A16lpht',
-      lop_pho: '10A16bt',
+      'acc-gvcn-user': '1016',
+      'acc-lt-truong': '10A16lt',
+      'acc-lp-kyluat': '10A16lpkl',
+      'acc-lp-hoctap': '10A16lpht',
+      'acc-bt-chidoan': '10A16bt',
     };
 
-    const isMatch = (acc.pin === oldPin.trim()) || (officialPins[role] === oldPin.trim());
+    const isMatch = (acc.pin === oldPin.trim()) || (officialPins[acc.id] === oldPin.trim());
     if (!isMatch) {
       return { success: false, message: 'Mã PIN hiện tại không chính xác!' };
     }
