@@ -498,6 +498,16 @@ class AppStateService {
             },
           ];
           this.activeSeatingPlanId = 'plan-official';
+        } else {
+          // Auto-sync active plan seats with current seats on startup
+          const activePlan = this.seatingPlans.find((p) => p.id === this.activeSeatingPlanId);
+          if (activePlan) {
+            if (this.seats.some((s) => s.student_id)) {
+              activePlan.seats = JSON.parse(JSON.stringify(this.seats));
+            } else if (activePlan.seats.some((s) => s.student_id)) {
+              this.seats = JSON.parse(JSON.stringify(activePlan.seats));
+            }
+          }
         }
 
         const savedDuty = localStorage.getItem('VTT_DUTY_ROSTER');
@@ -630,9 +640,53 @@ class AppStateService {
     return true;
   }
 
+  public syncActivePlanSeats() {
+    let activePlan = this.seatingPlans.find((p) => p.id === this.activeSeatingPlanId);
+    if (!activePlan) {
+      if (this.seatingPlans.length > 0) {
+        activePlan = this.seatingPlans[0];
+        this.activeSeatingPlanId = activePlan.id;
+      } else {
+        activePlan = {
+          id: 'plan-official',
+          name: 'Sơ đồ Lớp 10A16 (Hiện tại)',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          seats: JSON.parse(JSON.stringify(this.seats)),
+        };
+        this.seatingPlans = [activePlan];
+        this.activeSeatingPlanId = activePlan.id;
+      }
+    }
+
+    // Mirror current seats into active seating plan
+    activePlan.seats = JSON.parse(JSON.stringify(this.seats));
+    activePlan.updated_at = new Date().toISOString();
+
+    // Keep all students' seat_number attributes updated in sync with current seats
+    const seatedStudentIds = new Set<string>();
+    this.seats.forEach((seat) => {
+      if (seat.student_id) {
+        seatedStudentIds.add(seat.student_id);
+        const stu = this.students.find((s) => s.id === seat.student_id);
+        if (stu) {
+          const colGroup = Math.ceil(seat.col_number / 2);
+          stu.seat_number = `Bàn ${seat.table_number} (Cột ${colGroup} - Tổ ${colGroup})`;
+        }
+      }
+    });
+
+    this.students.forEach((s) => {
+      if (!seatedStudentIds.has(s.id)) {
+        s.seat_number = undefined;
+      }
+    });
+  }
+
   private saveLocalState() {
     if (typeof window === 'undefined') return;
     try {
+      this.syncActivePlanSeats();
       localStorage.setItem('VTT_CLASS_INFO', JSON.stringify(this.classInfo));
       localStorage.setItem('VTT_OFFICER_ACCOUNTS', JSON.stringify(this.officerAccounts));
       localStorage.setItem('VTT_GROUPS', JSON.stringify(this.groups));
