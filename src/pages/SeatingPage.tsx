@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { appState } from '../services/appStateService';
 import { Student, Seat } from '../types';
 import {
@@ -39,6 +39,11 @@ const unaccent = (str: string) => {
 };
 
 export const SeatingPage: React.FC = () => {
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    return appState.subscribe(() => setTick((t) => t + 1));
+  }, []);
+
   const seats = appState.seats;
   const students = appState.students;
   const currentUser = appState.currentUser;
@@ -87,6 +92,18 @@ export const SeatingPage: React.FC = () => {
 
   // Unseated students drawer state
   const [showUnseatedDrawer, setShowUnseatedDrawer] = useState(false);
+
+  // Saving state indicator
+  const [isSavingPlan, setIsSavingPlan] = useState(false);
+
+  const handleSaveSeatingPlan = async () => {
+    setIsSavingPlan(true);
+    try {
+      await appState.saveCurrentSeatsToPlan();
+    } finally {
+      setTimeout(() => setIsSavingPlan(false), 500);
+    }
+  };
 
   // Helper to find officer role badge for a student
   const getOfficerRoleBadge = (stu: Student) => {
@@ -250,8 +267,7 @@ export const SeatingPage: React.FC = () => {
       return;
     }
     if (confirm('⚠️ XÁC NHẬN: Bạn có chắc muốn LÀM TRỐNG TOÀN BỘ sơ đồ chỗ ngồi để xếp mới không?\n\nLưu ý: Hệ thống đã lưu sẵn Bản Dự Phòng. Nếu lỡ tay xóa, bạn chỉ cần bấm "↩️ Khôi phục Sơ đồ vừa làm" để quay lại ngay lập tức.')) {
-      appState.createSeatingBackupSnapshot();
-      seats.forEach((seat) => appState.assignStudentToSeat(seat.id, undefined));
+      appState.clearAllSeats();
       appState.showToast('Đã làm trống toàn bộ sơ đồ chỗ ngồi! Bạn có thể bấm "↩️ Khôi phục Sơ đồ vừa làm" nếu muốn quay lại.', 'info');
     }
   };
@@ -431,12 +447,17 @@ export const SeatingPage: React.FC = () => {
 
           {/* Save Active Plan Button */}
           <button
-            onClick={() => appState.saveCurrentSeatsToPlan()}
-            className="px-3 py-2 bg-emerald-700 hover:bg-emerald-600 text-white font-bold rounded-xl text-xs transition flex items-center gap-1.5 shadow-xs cursor-pointer"
-            title="Lưu cập nhật vị trí hiện tại vào phương án sơ đồ đang chọn"
+            onClick={handleSaveSeatingPlan}
+            disabled={isSavingPlan}
+            className="px-3.5 py-2 bg-emerald-700 hover:bg-emerald-600 active:bg-emerald-800 text-white font-extrabold rounded-xl text-xs transition flex items-center gap-1.5 shadow-md cursor-pointer border border-emerald-500/40"
+            title="Lưu cập nhật vị trí hiện tại vĩnh viễn vào bộ nhớ & Supabase Cloud (Không bị mất khi thoát quyền)"
           >
-            <Check className="w-3.5 h-3.5" />
-            <span>💾 Lưu Sơ Đồ</span>
+            {isSavingPlan ? (
+              <span className="animate-spin text-white">⏳</span>
+            ) : (
+              <Check className="w-3.5 h-3.5 text-emerald-200" />
+            )}
+            <span>{isSavingPlan ? 'Đang lưu Cloud...' : '💾 Lưu Sơ Đồ'}</span>
           </button>
 
           {/* Delete Plan Button */}
@@ -522,6 +543,20 @@ export const SeatingPage: React.FC = () => {
 
           {canManageSeating && (
             <>
+              <button
+                onClick={handleSaveSeatingPlan}
+                disabled={isSavingPlan}
+                className="px-3.5 py-1.5 text-xs font-black bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl shadow-xs transition active:scale-95 cursor-pointer flex items-center gap-1.5 border border-emerald-400/30"
+                title="Lưu vĩnh viễn sơ đồ chỗ ngồi vào hệ thống và Supabase Cloud (Không bị mất khi thoát quyền)"
+              >
+                {isSavingPlan ? (
+                  <span className="animate-spin text-white">⏳</span>
+                ) : (
+                  <Check className="w-3.5 h-3.5 text-emerald-200" />
+                )}
+                <span>{isSavingPlan ? 'Đang lưu Cloud...' : '💾 Lưu Sơ Đồ'}</span>
+              </button>
+
               <button
                 onClick={() => setIsQuickTypeMode(!isQuickTypeMode)}
                 className={`px-3 py-1.5 text-xs font-bold rounded-xl shadow-2xs transition active:scale-95 cursor-pointer flex items-center gap-1.5 ${

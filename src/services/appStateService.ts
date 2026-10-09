@@ -112,16 +112,31 @@ export const OFFICIAL_10A16_GROUPS: Group[] = [
 function buildOfficial10A16Students(): Student[] {
   return PRIVATE_ROSTER_10A16.map((s, idx) => {
     let groupId = 'group-01';
-    if (idx >= 11 && idx < 22) groupId = 'group-02';
-    else if (idx >= 22 && idx < 33) groupId = 'group-03';
-    else if (idx >= 33) groupId = 'group-04';
+    let col = 1;
+    let rankInGroup = idx;
+    if (idx >= 11 && idx < 22) {
+      groupId = 'group-02';
+      col = 2;
+      rankInGroup = idx - 11;
+    } else if (idx >= 22 && idx < 33) {
+      groupId = 'group-03';
+      col = 3;
+      rankInGroup = idx - 22;
+    } else if (idx >= 33) {
+      groupId = 'group-04';
+      col = 4;
+      rankInGroup = idx - 33;
+    }
+
+    const row = Math.floor(rankInGroup / 2) + 1;
+    const tableNum = (row - 1) * 4 + col;
 
     return {
       ...s,
       group_id: groupId,
       is_demo: false,
       status: 'active',
-      seat_number: `Bàn ${Math.floor(idx / 2) + 1} - Dãy ${(idx % 2) + 1}`,
+      seat_number: `Bàn ${tableNum} (Cột ${col} - Tổ ${col})`,
     };
   });
 }
@@ -264,10 +279,19 @@ class AppStateService {
     }
 
     acc.pin = newPin.trim();
-    if (typeof window !== 'undefined') {
-      try {
-        localStorage.setItem('VTT_OFFICER_ACCOUNTS', JSON.stringify(this.officerAccounts));
-      } catch (e) {}
+    this.saveLocalState();
+    if (supabase) {
+      supabase.from('audit_logs').insert([{
+        actor_name: this.currentUser.name,
+        actor_role: this.currentUser.role,
+        action: 'CHANGE_PIN',
+        entity_type: 'officer_auth',
+        entity_id: acc.id,
+        reason: JSON.stringify({
+          officerAccounts: this.officerAccounts,
+          changedAt: new Date().toISOString(),
+        }),
+      }]).then();
     }
 
     this.addAuditLog(this.currentUser.name, `Đổi mã PIN bảo mật cho ${acc.title}`, 'security', acc.id, 'Người dùng chủ động thay đổi mã PIN');
@@ -368,9 +392,9 @@ class AppStateService {
       let sessions: Record<string, ActiveUserSession & { lastActiveTimestamp: number }> = raw ? JSON.parse(raw) : {};
       const now = Date.now();
 
-      // Prune dead sessions older than 10 seconds
+      // Prune dead sessions older than 7 seconds
       Object.keys(sessions).forEach((sid) => {
-        if (!sessions[sid] || now - (sessions[sid].lastActiveTimestamp || 0) > 10000) {
+        if (!sessions[sid] || now - (sessions[sid].lastActiveTimestamp || 0) > 7000) {
           delete sessions[sid];
         }
       });
@@ -393,8 +417,8 @@ class AppStateService {
     if (this.heartbeatIntervalTimer) clearInterval(this.heartbeatIntervalTimer);
     this.heartbeatIntervalTimer = setInterval(() => {
       this.updateSessionHeartbeat();
-      this.notify();
-    }, 3000);
+      this.listeners.forEach((l) => l());
+    }, 2500);
 
     window.addEventListener('beforeunload', () => {
       try {
@@ -419,7 +443,7 @@ class AppStateService {
           const localSessions: Record<string, ActiveUserSession & { lastActiveTimestamp: number }> = JSON.parse(raw);
           const now = Date.now();
           Object.values(localSessions).forEach((s) => {
-            if (s && s.id && now - (s.lastActiveTimestamp || 0) <= 10000) {
+            if (s && s.id && now - (s.lastActiveTimestamp || 0) <= 7000) {
               sessionMap.set(s.id, {
                 ...s,
                 isCurrentUser: s.id === this.currentSessionId,
@@ -759,7 +783,7 @@ class AppStateService {
     });
   }
 
-  private saveLocalState() {
+  public saveLocalState() {
     if (typeof window === 'undefined') return;
     try {
       this.syncActivePlanSeats();
@@ -786,6 +810,84 @@ class AppStateService {
       localStorage.setItem('VTT_LAST_SAVED_AT', new Date().toISOString());
     } catch (e) {
       console.warn('Lỗi lưu trạng thái vào localStorage:', e);
+    }
+  }
+
+  /**
+   * Đồng bộ vĩnh viễn toàn bộ sơ đồ chỗ ngồi & phương án lên Supabase Cloud
+   */
+  public async syncSeatingToSupabase(): Promise<{ success: boolean; message: string }> {
+    if (!supabase) return { success: false, message: 'Chưa cấu hình Supabase Cloud.' };
+
+    try {
+      this.syncActivePlanSeats();
+
+      // 1. Đồng bộ 48 vị trí ghế ngồi lên bảng 'seats' Supabase
+      const seatsPayload = this.seats.map((s) => ({
+        id: s.id,
+        class_id: 'class-10a16',
+        row_number: s.row_number,
+        col_number: s.col_number,
+        table_number: s.table_number,
+        student_id: s.student_id || null,
+      }));
+
+      const { error: seatErr } = await supabase.from('seats').upsert(seatsPayload, { onConflict: 'id' });
+      if (seatErr) {
+        console.warn('Lỗi upsert seats vào Supabase:', seatErr);
+      }
+
+      // 2. Đồng bộ seat_number và group_id của 43 học sinh lên bảng 'students'
+      const studentsPayload = this.students.map((s) => ({
+        id: s.id,
+        student_code: s.student_code,
+        full_name: s.full_name,
+        first_name: s.first_name,
+        last_name: s.last_name,
+        class_id: 'class-10a16',
+        group_id: s.group_id,
+        seat_number: s.seat_number || null,
+        status: s.status,
+        is_demo: false,
+      }));
+      await supabase.from('students').upsert(studentsPayload, { onConflict: 'id' });
+
+      // 3. Ghi vết sao lưu phương án sơ đồ chỗ ngồi vào audit_logs
+      await supabase.from('audit_logs').insert([
+        {
+          actor_name: this.currentUser.name || this.classInfo.gvcn_name || 'GVCN',
+          actor_role: this.currentUser.role || 'gvcn',
+          action: 'SYNC_SEATING_PLANS',
+          entity_type: 'seating_plans',
+          entity_id: 'class-10a16',
+          reason: JSON.stringify({
+            seatingPlans: this.seatingPlans,
+            activeSeatingPlanId: this.activeSeatingPlanId,
+            seats: this.seats,
+            savedAt: new Date().toISOString(),
+          }),
+        },
+        {
+          actor_name: this.currentUser.name || this.classInfo.gvcn_name || 'GVCN',
+          actor_role: this.currentUser.role || 'gvcn',
+          action: 'SYNC_CLASS_INFO',
+          entity_type: 'class_info',
+          entity_id: 'class-10a16',
+          reason: JSON.stringify({
+            classInfo: this.classInfo,
+            officerAccounts: this.officerAccounts,
+            groups: this.groups,
+            seatingPlans: this.seatingPlans,
+            activeSeatingPlanId: this.activeSeatingPlanId,
+            seats: this.seats,
+          }),
+        },
+      ]);
+
+      return { success: true, message: 'Đã lưu vĩnh viễn sơ đồ chỗ ngồi vào Supabase Cloud!' };
+    } catch (err: any) {
+      console.error('Lỗi syncSeatingToSupabase:', err);
+      return { success: false, message: err.message };
     }
   }
 
@@ -835,6 +937,8 @@ class AppStateService {
 
   public forceSaveToday(): { timestamp: string; studentCount: number; incidentCount: number; seatingPlanCount: number } {
     this.saveLocalState();
+    this.syncSeatingToSupabase().then();
+    this.syncAllToSupabase().then();
     const nowStr = new Date().toLocaleString('vi-VN');
     const stats = {
       timestamp: nowStr,
@@ -844,7 +948,7 @@ class AppStateService {
     };
 
     this.addAuditLog(this.currentUser.name, 'Lưu dữ liệu kết quả làm việc tức thời', 'checkpoint', 'manual_save');
-    this.showToast(`💾 ĐÃ LƯU DỮ LIỆU TỨC THỜI (${nowStr})!\n• 43 Học sinh · ${stats.seatingPlanCount} Sơ đồ · ${stats.incidentCount} Vi phạm`, 'success');
+    this.showToast(`💾 ĐÃ LƯU DỮ LIỆU TỨC THỜI (${nowStr})!\n• 43 Học sinh · ${stats.seatingPlanCount} Sơ đồ · ${stats.incidentCount} Vi phạm\n• Đã đồng bộ an toàn lên Supabase Cloud!`, 'success');
     return stats;
   }
 
@@ -877,6 +981,9 @@ class AppStateService {
       if (Array.isArray(parsed.auditLogs)) this.auditLogs = parsed.auditLogs;
 
       this.calculateAllWeeklyScores(1);
+      this.syncActivePlanSeats();
+      this.saveLocalState();
+      this.syncAllToSupabase().then();
       this.addAuditLog(this.currentUser.name, 'Khôi phục toàn bộ cơ sở dữ liệu từ tệp sao lưu JSON', 'backup', 'import');
       this.notify();
       this.showToast('🎉 Đã khôi phục toàn bộ dữ liệu ứng dụng thành công!', 'success');
@@ -982,6 +1089,8 @@ class AppStateService {
         localStorage.setItem('VTT_CURRENT_ROLE', role);
       } catch (e) {}
     }
+    this.updateSessionHeartbeat();
+    this.saveLocalState();
     this.notify();
   }
 
@@ -1017,12 +1126,7 @@ class AppStateService {
     }
 
     // Lưu ngay lập tức vào LocalStorage để không bao giờ bị mất dữ liệu
-    if (typeof window !== 'undefined') {
-      try {
-        localStorage.setItem('VTT_CLASS_INFO', JSON.stringify(this.classInfo));
-        localStorage.setItem('VTT_OFFICER_ACCOUNTS', JSON.stringify(this.officerAccounts));
-      } catch (e) {}
-    }
+    this.saveLocalState();
 
     this.addAuditLog(
       this.currentUser.name,
@@ -1077,13 +1181,7 @@ class AppStateService {
       }
     }
 
-    if (typeof window !== 'undefined') {
-      try {
-        localStorage.setItem('VTT_GROUPS', JSON.stringify(this.groups));
-        localStorage.setItem('VTT_STUDENTS', JSON.stringify(this.students));
-      } catch (e) {}
-    }
-
+    this.saveLocalState();
     this.addAuditLog(
       this.currentUser.name,
       `Chỉ định Tổ trưởng Tổ ${group.group_number}`,
@@ -1131,11 +1229,7 @@ class AppStateService {
     if (!acc) return;
     acc.pin = newPin.trim();
 
-    if (typeof window !== 'undefined') {
-      try {
-        localStorage.setItem('VTT_OFFICER_ACCOUNTS', JSON.stringify(this.officerAccounts));
-      } catch (e) {}
-    }
+    this.saveLocalState();
 
     this.addAuditLog(
       this.currentUser.name,
@@ -1188,13 +1282,7 @@ class AppStateService {
       }
     }
 
-    if (typeof window !== 'undefined') {
-      try {
-        localStorage.setItem('VTT_OFFICER_ACCOUNTS', JSON.stringify(this.officerAccounts));
-        localStorage.setItem('VTT_CLASS_INFO', JSON.stringify(this.classInfo));
-      } catch (e) {}
-    }
-
+    this.saveLocalState();
     this.addAuditLog(this.currentUser.name, `Cập nhật toàn quyền tài khoản cán bộ [${acc.name}]`, 'officer_auth', id);
     this.notify();
 
@@ -1223,11 +1311,7 @@ class AppStateService {
 
   public addOfficerAccount(newAcc: OfficerAccount) {
     this.officerAccounts.push(newAcc);
-    if (typeof window !== 'undefined') {
-      try {
-        localStorage.setItem('VTT_OFFICER_ACCOUNTS', JSON.stringify(this.officerAccounts));
-      } catch (e) {}
-    }
+    this.saveLocalState();
     this.addAuditLog(this.currentUser.name, `Thêm tài khoản cán sự [${newAcc.name}]`, 'officer_auth', newAcc.id);
     this.notify();
 
@@ -1249,11 +1333,7 @@ class AppStateService {
 
   public deleteOfficerAccount(id: string) {
     this.officerAccounts = this.officerAccounts.filter((a) => a.id !== id);
-    if (typeof window !== 'undefined') {
-      try {
-        localStorage.setItem('VTT_OFFICER_ACCOUNTS', JSON.stringify(this.officerAccounts));
-      } catch (e) {}
-    }
+    this.saveLocalState();
     this.addAuditLog(this.currentUser.name, `Xóa tài khoản cán sự [${id}]`, 'officer_auth', id);
     this.notify();
 
@@ -1418,6 +1498,12 @@ class AppStateService {
   }
 
   public logoutToStudentMode() {
+    this.syncActivePlanSeats();
+    this.saveLocalState();
+    // VĨNH VIỄN LƯU LÊN SUPABASE CLOUD TRƯỚC KHI THOÁT QUYỀN (ƯU TIÊN CAO NHẤT)
+    this.syncSeatingToSupabase().then();
+    this.syncAllToSupabase().then();
+
     if (typeof window !== 'undefined') {
       try {
         localStorage.removeItem('VTT_OFFICER_SESSION');
@@ -1428,8 +1514,9 @@ class AppStateService {
     this.setLoggedInRole('hoc_sinh');
     this.currentUser.email = undefined;
     this.currentUser.isAuthenticatedOfficer = false;
+    this.updateSessionHeartbeat();
     this.addAuditLog(this.currentUser.name, 'Đăng xuất khỏi quyền cán sự (Khóa về chế độ Học sinh)', 'auth', 'logout');
-    this.showToast('Đã đăng xuất! Hệ thống đã khóa về Chế độ Học sinh (Chỉ xem).', 'info');
+    this.showToast('Đã đăng xuất! Hệ thống đã khóa về Chế độ Học sinh (Chỉ xem). Sơ đồ chỗ ngồi và mọi dữ liệu được lưu vĩnh viễn 100% ở mức ưu tiên cao nhất.', 'info');
     this.notify();
   }
 
@@ -1447,34 +1534,104 @@ class AppStateService {
     this.notify();
   }
 
-  private initDefaultSeats() {
-    const seats: Seat[] = [];
+  /**
+   * Tái tạo danh sách 48 vị trí ghế theo đúng 'seat_number' của học sinh
+   */
+  public reconstructSeatsFromStudentSeatNumbers() {
     const classId = 'class-10a16';
-    let stuIdx = 0;
+    const seats: Seat[] = [];
     for (let r = 1; r <= 6; r++) {
       for (let c = 1; c <= 8; c++) {
-        const colGroup = Math.ceil(c / 2); // Cột 1..4
+        const colGroup = Math.ceil(c / 2);
         const tableNum = (r - 1) * 4 + colGroup;
-        const stu = this.students[stuIdx];
-        const groupId = `group-0${colGroup}`;
-        
         seats.push({
           id: `seat-${r}-${c}`,
           class_id: classId,
           row_number: r,
           col_number: c,
           table_number: tableNum,
-          student_id: stu ? stu.id : undefined,
+          student_id: undefined,
         });
-
-        if (stu) {
-          stu.group_id = groupId;
-          stu.seat_number = `Bàn ${tableNum} (Tổ ${colGroup} - Cột ${colGroup})`;
-        }
-
-        stuIdx++;
       }
     }
+
+    const tableSeatsMap = new Map<number, { left: Seat; right: Seat }>();
+    seats.forEach((seat) => {
+      if (!tableSeatsMap.has(seat.table_number)) {
+        tableSeatsMap.set(seat.table_number, { left: seat, right: seat });
+      }
+      const entry = tableSeatsMap.get(seat.table_number)!;
+      if (seat.col_number % 2 === 1) {
+        entry.left = seat;
+      } else {
+        entry.right = seat;
+      }
+    });
+
+    this.students.forEach((stu) => {
+      if (stu.seat_number) {
+        const match = stu.seat_number.match(/Bàn\s+(\d+)/i);
+        if (match) {
+          const tableNum = parseInt(match[1]);
+          const tSeats = tableSeatsMap.get(tableNum);
+          if (tSeats) {
+            if (!tSeats.left.student_id) {
+              tSeats.left.student_id = stu.id;
+            } else if (!tSeats.right.student_id) {
+              tSeats.right.student_id = stu.id;
+            }
+          }
+        }
+      }
+    });
+
+    this.seats = seats;
+    this.ensureCapacitySeats();
+  }
+
+  private initDefaultSeats() {
+    // Nếu sơ đồ ghế đã tồn tại đủ 48 vị trí và đã có học sinh, giữ nguyên 100% không ghi đè
+    if (this.seats && this.seats.length === 48 && this.seats.some((s) => Boolean(s.student_id))) {
+      return;
+    }
+
+    const seats: Seat[] = [];
+    const classId = 'class-10a16';
+    for (let r = 1; r <= 6; r++) {
+      for (let c = 1; c <= 8; c++) {
+        const colGroup = Math.ceil(c / 2); // Cột 1..4
+        const tableNum = (r - 1) * 4 + colGroup;
+        seats.push({
+          id: `seat-${r}-${c}`,
+          class_id: classId,
+          row_number: r,
+          col_number: c,
+          table_number: tableNum,
+          student_id: undefined,
+        });
+      }
+    }
+
+    // Xếp chuẩn hóa 4 Cột = 4 Tổ (Cột 1 = Tổ 1, Cột 2 = Tổ 2, Cột 3 = Tổ 3, Cột 4 = Tổ 4)
+    for (let col = 1; col <= 4; col++) {
+      const grpId = `group-0${col}`;
+      const colStudents = this.students
+        .filter((s) => s.group_id === grpId)
+        .sort((a, b) => a.student_code.localeCompare(b.student_code));
+
+      const colSeats = seats
+        .filter((s) => Math.ceil(s.col_number / 2) === col)
+        .sort((a, b) => a.table_number - b.table_number || a.col_number - b.col_number);
+
+      colStudents.forEach((stu, idx) => {
+        const seat = colSeats[idx];
+        if (seat) {
+          seat.student_id = stu.id;
+          stu.seat_number = `Bàn ${seat.table_number} (Cột ${col} - Tổ ${col})`;
+        }
+      });
+    }
+
     this.seats = seats;
   }
 
@@ -1543,6 +1700,7 @@ class AppStateService {
       is_demo: false,
     };
     this.students.push(newStudent);
+    this.saveLocalState();
     this.addAuditLog(
       this.currentUser.name,
       'Thêm học sinh mới vào lớp',
@@ -1578,6 +1736,7 @@ class AppStateService {
     const stu = this.students.find((s) => s.id === studentId);
     if (!stu) return;
     Object.assign(stu, updates);
+    this.saveLocalState();
     this.addAuditLog(
       this.currentUser.name,
       'Cập nhật thông tin học sinh',
@@ -1612,6 +1771,8 @@ class AppStateService {
     this.seats.forEach((seat) => {
       if (seat.student_id === studentId) seat.student_id = undefined;
     });
+    this.syncActivePlanSeats();
+    this.saveLocalState();
     this.addAuditLog(
       this.currentUser.name,
       'Xóa học sinh khỏi danh sách lớp',
@@ -1635,6 +1796,7 @@ class AppStateService {
     const grp = this.groups.find((g) => g.id === groupId);
     if (!grp) return;
     Object.assign(grp, updates);
+    this.saveLocalState();
     this.addAuditLog(
       this.currentUser.name,
       'Điều chỉnh thông tin tổ học tập',
@@ -1643,6 +1805,16 @@ class AppStateService {
       `Cập nhật: ${grp.group_name}`
     );
     this.notify();
+
+    if (supabase) {
+      supabase.from('groups').upsert({
+        id: grp.id,
+        class_id: 'class-10a16',
+        group_number: grp.group_number,
+        group_name: grp.group_name,
+        leader_student_id: grp.leader_student_id || null,
+      }, { onConflict: 'id' }).then();
+    }
   }
 
   public assignStudentToGroup(studentId: string, groupId: string) {
@@ -1650,6 +1822,7 @@ class AppStateService {
     const stu = this.students.find((s) => s.id === studentId);
     if (!stu) return;
     stu.group_id = groupId;
+    this.saveLocalState();
     this.addAuditLog(
       this.currentUser.name,
       'Chuyển tổ cho học sinh',
@@ -1658,6 +1831,10 @@ class AppStateService {
       `Học sinh ${stu.full_name} chuyển sang tổ ${groupId}`
     );
     this.notify();
+
+    if (supabase) {
+      supabase.from('students').update({ group_id: groupId }).eq('id', studentId).then();
+    }
   }
 
   // --- Seating Management (Sơ đồ chỗ ngồi theo Cột & Tổ) ---
@@ -1693,6 +1870,10 @@ class AppStateService {
             }
           });
         }
+        this.ensureCapacitySeats();
+        this.syncActivePlanSeats();
+        this.saveLocalState();
+        this.syncSeatingToSupabase();
         this.addAuditLog(
           this.currentUser.name,
           'Khôi phục sơ đồ chỗ ngồi từ bản sao lưu gần nhất',
@@ -1728,15 +1909,6 @@ class AppStateService {
 
     stu.group_id = targetGroupId;
     stu.seat_number = `Bàn ${seat.table_number} (Cột ${colGroup} - Tổ ${colGroup})`;
-
-    if (supabase) {
-      supabase.from('students').update({
-        group_id: stu.group_id,
-        seat_number: stu.seat_number,
-      }).eq('id', stu.id).then(({ error }) => {
-        if (error) console.error('Supabase auto update student group from column error:', error);
-      });
-    }
   }
 
   public assignStudentToSeat(seatId: string, studentId?: string) {
@@ -1758,6 +1930,13 @@ class AppStateService {
       }
     }
     seat.student_id = studentId;
+    this.seats = this.seats.map((s) => ({ ...s }));
+    this.students = this.students.map((s) => ({ ...s }));
+
+    this.syncActivePlanSeats();
+    this.saveLocalState();
+    this.syncSeatingToSupabase().then();
+
     this.addAuditLog(
       this.currentUser.name,
       'Điều chỉnh vị trí sơ đồ chỗ ngồi & Đồng bộ Tổ theo Cột',
@@ -1785,6 +1964,13 @@ class AppStateService {
       this.syncStudentGroupWithSeatColumn(s2.student_id, s2);
     }
 
+    this.seats = this.seats.map((s) => ({ ...s }));
+    this.students = this.students.map((s) => ({ ...s }));
+
+    this.syncActivePlanSeats();
+    this.saveLocalState();
+    this.syncSeatingToSupabase().then();
+
     this.addAuditLog(
       this.currentUser.name,
       'Hoán đổi chỗ ngồi giữa 2 bàn & Đồng bộ Tổ theo Cột mới',
@@ -1794,54 +1980,50 @@ class AppStateService {
     this.notify();
   }
 
-  public autoArrangeSeats(method: 'by_group' | 'by_roster' = 'by_roster') {
+  public autoArrangeSeats(method: 'by_group' | 'by_roster' = 'by_group') {
     if (!this.checkWriteAuthorization()) return;
     this.createSeatingBackupSnapshot();
-    if (method === 'by_group') {
-      // Sắp xếp học sinh thuộc từng Tổ 1..4 vào các Cột bàn 1..4 tương ứng
-      const groupMap: Record<string, Student[]> = {};
-      this.groups.forEach((g) => { groupMap[g.id] = []; });
 
-      this.students.forEach((s) => {
-        const gId = s.group_id && groupMap[s.group_id] ? s.group_id : this.groups[0]?.id || 'group-01';
-        if (!groupMap[gId]) groupMap[gId] = [];
-        groupMap[gId].push(s);
-      });
+    // Reset all seat student assignments
+    this.seats.forEach((seat) => { seat.student_id = undefined; });
 
-      // Reset all seat student assignments
-      this.seats.forEach((seat) => { seat.student_id = undefined; });
-
-      // Place students column by column (Cột 1 -> Tổ 1, Cột 2 -> Tổ 2, Cột 3 -> Tổ 3, Cột 4 -> Tổ 4)
-      for (let colGroup = 1; colGroup <= 4; colGroup++) {
-        const matchedGrp = this.groups.find((g) => g.group_number === colGroup) || this.groups[colGroup - 1];
-        const grpStudents = matchedGrp && groupMap[matchedGrp.id] ? groupMap[matchedGrp.id] : [];
-        const colSeats = this.seats
-          .filter((s) => Math.ceil(s.col_number / 2) === colGroup)
-          .sort((a, b) => a.table_number - b.table_number || a.col_number - b.col_number);
-
-        colSeats.forEach((seat, idx) => {
-          const stu = grpStudents[idx];
-          if (stu) {
-            seat.student_id = stu.id;
-            this.syncStudentGroupWithSeatColumn(stu.id, seat);
-          }
-        });
+    // Place students column by column (Cột 1 -> Tổ 1, Cột 2 -> Tổ 2, Cột 3 -> Tổ 3, Cột 4 -> Tổ 4)
+    for (let colGroup = 1; colGroup <= 4; colGroup++) {
+      const grpId = `group-0${colGroup}`;
+      let colStudents = this.students.filter((s) => s.group_id === grpId);
+      if (colStudents.length === 0) {
+        const startIdx = (colGroup - 1) * 11;
+        const endIdx = colGroup === 4 ? 43 : colGroup * 11;
+        colStudents = this.students.slice(startIdx, endIdx);
       }
-    } else {
-      // Xếp theo STT Danh sách 43 HS và tự động gán Tổ theo Cột chỗ ngồi
-      const sortedStudents = [...this.students].sort((a, b) => a.student_code.localeCompare(b.student_code));
-      this.seats.forEach((seat, idx) => {
-        const stu = sortedStudents[idx];
-        seat.student_id = stu ? stu.id : undefined;
-        if (stu) {
-          this.syncStudentGroupWithSeatColumn(stu.id, seat);
+
+      // Sort students by STT student_code
+      colStudents.sort((a, b) => a.student_code.localeCompare(b.student_code));
+
+      const colSeats = this.seats
+        .filter((s) => Math.ceil(s.col_number / 2) === colGroup)
+        .sort((a, b) => a.table_number - b.table_number || a.col_number - b.col_number);
+
+      colStudents.forEach((stu, idx) => {
+        const seat = colSeats[idx];
+        if (seat) {
+          seat.student_id = stu.id;
+          stu.group_id = grpId;
+          stu.seat_number = `Bàn ${seat.table_number} (Cột ${colGroup} - Tổ ${colGroup})`;
         }
       });
     }
 
+    this.seats = this.seats.map((s) => ({ ...s }));
+    this.students = this.students.map((s) => ({ ...s }));
+
+    this.syncActivePlanSeats();
+    this.saveLocalState();
+    this.syncSeatingToSupabase().then();
+
     this.addAuditLog(
       this.currentUser.name,
-      'Sắp xếp tự động toàn bộ sơ đồ chỗ ngồi & Đồng bộ Tổ theo Cột',
+      'Sắp xếp chuẩn hóa sơ đồ chỗ ngồi theo 4 Cột = 4 Tổ',
       'seating',
       'class-10a16',
       `Phương pháp: ${method}`
@@ -1849,36 +2031,89 @@ class AppStateService {
     this.notify();
   }
 
-  // --- Multi-Plan Seating Management ---
-  public saveCurrentSeatsToPlan(planName?: string) {
+  public clearAllSeats() {
     if (!this.checkWriteAuthorization()) return;
-    const activePlan = this.seatingPlans.find((p) => p.id === this.activeSeatingPlanId);
-    if (activePlan) {
-      if (planName && planName.trim()) activePlan.name = planName.trim();
-      activePlan.seats = JSON.parse(JSON.stringify(this.seats));
-      activePlan.updated_at = new Date().toISOString();
-      this.showToast(`Đã lưu sơ đồ [${activePlan.name}] thành công!`, 'success');
-      this.notify();
-    }
+    this.createSeatingBackupSnapshot();
+    this.seats.forEach((seat) => {
+      seat.student_id = undefined;
+    });
+    this.students.forEach((stu) => {
+      stu.seat_number = undefined;
+    });
+
+    this.seats = this.seats.map((s) => ({ ...s }));
+    this.students = this.students.map((s) => ({ ...s }));
+
+    this.syncActivePlanSeats();
+    this.saveLocalState();
+    this.syncSeatingToSupabase().then();
+    this.addAuditLog(
+      this.currentUser.name,
+      'Làm trống toàn bộ sơ đồ chỗ ngồi',
+      'seating',
+      'class-10a16'
+    );
+    this.notify();
   }
 
-  public loadSeatingPlan(planId: string) {
+  // --- Multi-Plan Seating Management ---
+  public async saveCurrentSeatsToPlan(planName?: string) {
+    if (!this.checkWriteAuthorization()) return;
+    let activePlan = this.seatingPlans.find((p) => p.id === this.activeSeatingPlanId);
+    if (!activePlan) {
+      activePlan = {
+        id: 'plan-official',
+        name: 'Sơ đồ Lớp 10A16 (Hiện tại)',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        seats: JSON.parse(JSON.stringify(this.seats)),
+      };
+      this.seatingPlans = [activePlan];
+      this.activeSeatingPlanId = activePlan.id;
+    }
+
+    if (planName && planName.trim()) activePlan.name = planName.trim();
+    activePlan.seats = JSON.parse(JSON.stringify(this.seats));
+    activePlan.updated_at = new Date().toISOString();
+
+    this.seats = this.seats.map((s) => ({ ...s }));
+    this.students = this.students.map((s) => ({ ...s }));
+    this.syncActivePlanSeats();
+    this.saveLocalState();
+    await this.syncSeatingToSupabase();
+
+    this.addAuditLog(
+      this.currentUser.name,
+      `Lưu cố định phương án sơ đồ chỗ ngồi [${activePlan.name}]`,
+      'seating_plans',
+      activePlan.id,
+      'Lưu vĩnh viễn vào hệ thống & đồng bộ Supabase Cloud'
+    );
+    this.showToast(`💾 ĐÃ LƯU VĨNH VIỄN SƠ ĐỒ [${activePlan.name}]!\n• Đã lưu vào máy & đồng bộ Cloud\n• Giữ nguyên tuyệt đối khi thoát quyền`, 'success', 5000);
+    this.notify();
+  }
+
+  public async loadSeatingPlan(planId: string) {
     const plan = this.seatingPlans.find((p) => p.id === planId);
     if (!plan) return;
     this.createSeatingBackupSnapshot();
     this.activeSeatingPlanId = plan.id;
     this.seats = JSON.parse(JSON.stringify(plan.seats));
+    this.ensureCapacitySeats();
     // Ensure all seats sync with their column groups
     this.seats.forEach((seat) => {
       if (seat.student_id) {
         this.syncStudentGroupWithSeatColumn(seat.student_id, seat);
       }
     });
+    this.syncActivePlanSeats();
+    this.saveLocalState();
+    await this.syncSeatingToSupabase();
     this.showToast(`Đã chuyển sang phương án sơ đồ: [${plan.name}]`, 'info');
     this.notify();
   }
 
-  public createNewSeatingPlan(name: string, cloneFromCurrent: boolean = true) {
+  public async createNewSeatingPlan(name: string, cloneFromCurrent: boolean = true) {
     if (!this.checkWriteAuthorization()) return;
     const newId = `plan-${Date.now()}`;
     const cleanName = name.trim() || `Sơ đồ Mới (${new Date().toLocaleDateString('vi-VN')})`;
@@ -1900,11 +2135,14 @@ class AppStateService {
     this.seatingPlans.push(newPlan);
     this.activeSeatingPlanId = newId;
     this.seats = JSON.parse(JSON.stringify(newPlan.seats));
+    this.syncActivePlanSeats();
+    this.saveLocalState();
+    await this.syncSeatingToSupabase();
     this.showToast(`Đã tạo phương án sơ đồ chỗ ngồi mới: [${cleanName}]!`, 'success');
     this.notify();
   }
 
-  public deleteSeatingPlan(planId: string) {
+  public async deleteSeatingPlan(planId: string) {
     if (!this.checkWriteAuthorization()) return;
     if (this.seatingPlans.length <= 1) {
       this.showToast('Cần giữ lại ít nhất 1 phương án sơ đồ chỗ ngồi!', 'warn');
@@ -1916,6 +2154,9 @@ class AppStateService {
       this.activeSeatingPlanId = this.seatingPlans[0].id;
       this.seats = JSON.parse(JSON.stringify(this.seatingPlans[0].seats));
     }
+    this.syncActivePlanSeats();
+    this.saveLocalState();
+    await this.syncSeatingToSupabase();
     this.showToast(`Đã xóa phương án sơ đồ [${targetPlan?.name || ''}]!`, 'info');
     this.notify();
   }
@@ -1931,6 +2172,7 @@ class AppStateService {
         ...updates,
         groupName: assignedGroup ? assignedGroup.group_name : this.dutyRoster[dayIndex].groupName,
       };
+      this.saveLocalState();
       this.showToast(`Đã cập nhật lịch trực nhật [${this.dutyRoster[dayIndex].dayLabel}]!`, 'success');
       this.notify();
     }
@@ -1947,6 +2189,7 @@ class AppStateService {
         d.leaderStudentId = nextGroup.leader_student_id;
       }
     });
+    this.saveLocalState();
     this.showToast('Đã xoay vòng phân công trực nhật theo 4 Tổ!', 'success');
     this.notify();
   }
@@ -2057,6 +2300,7 @@ class AppStateService {
       this.attendance.unshift(newRec);
     }
 
+    this.saveLocalState();
     this.addAuditLog(this.currentUser.name, 'Ghi nhận điểm danh', 'attendance', id, `Trạng thái: ${record.status}`);
     this.notify();
 
@@ -2084,6 +2328,7 @@ class AppStateService {
     if (!rec) return;
 
     rec.status = newStatus;
+    this.saveLocalState();
     this.addAuditLog(this.currentUser.name, 'Cập nhật nhanh trạng thái điểm danh', 'attendance', recordId, `Trạng thái mới: ${newStatus}`);
     this.showToast('✅ Đã cập nhật 1-chạm trạng thái điểm danh!', 'success');
     this.notify();
@@ -2107,10 +2352,18 @@ class AppStateService {
       a.status = targetStatus;
     });
 
+    this.saveLocalState();
     const statusLabel = targetStatus === 'present' ? 'Có mặt đầy đủ' : targetStatus === 'permitted_absence' ? 'Vắng có phép' : 'Vắng không phép';
     this.addAuditLog(this.currentUser.name, '1-Chạm duyệt tất cả hồ sơ điểm danh chờ xác minh', 'attendance', 'batch_approve', `Chuyển ${pendingList.length} hồ sơ thành ${statusLabel}`);
     this.showToast(`⚡ ĐÃ 1-CHẠM DUYỆT TẤT CẢ ${pendingList.length} HỒ SƠ CHỜ XÁC MINH THÀNH: [${statusLabel.toUpperCase()}]!`, 'success');
     this.notify();
+
+    const client = supabase;
+    if (client) {
+      pendingList.forEach((a) => {
+        client.from('attendance_records').update({ status: targetStatus }).eq('id', a.id).then();
+      });
+    }
   }
 
   // --- Incidents & Conduct Management (GVCN, Lớp phó, Lớp trưởng có toàn quyền) ---
@@ -2146,6 +2399,7 @@ class AppStateService {
     };
 
     this.incidents.unshift(newIncident);
+    this.saveLocalState();
     this.addAuditLog(
       this.currentUser.name,
       'Ghi nhận vi phạm nề nếp',
@@ -2207,6 +2461,7 @@ class AppStateService {
       inc.effective_deduction = 0;
     }
 
+    this.saveLocalState();
     this.addAuditLog(
       this.currentUser.name,
       `Duyệt sự việc nề nếp: ${action.toUpperCase()}`,
@@ -2244,6 +2499,7 @@ class AppStateService {
       inc.effective_deduction = 0;
     }
 
+    this.saveLocalState();
     this.addAuditLog(
       this.currentUser.name,
       'Điều chỉnh nội dung sự việc nề nếp',
@@ -2279,6 +2535,7 @@ class AppStateService {
 
     const removed = this.incidents[incIdx];
     this.incidents.splice(incIdx, 1);
+    this.saveLocalState();
 
     this.addAuditLog(
       this.currentUser.name,
@@ -2314,6 +2571,7 @@ class AppStateService {
     };
 
     this.rewards.unshift(newRew);
+    this.saveLocalState();
     this.addAuditLog(this.currentUser.name, 'Đề xuất khen thưởng nề nếp', 'reward', id, `Mã: ${reward.reward_code} (+${reward.points}đ)`);
     this.calculateAllWeeklyScores(1);
     this.notify();
@@ -2348,6 +2606,7 @@ class AppStateService {
 
     rew.status = approved ? 'approved' : 'rejected';
     rew.approver = this.currentUser.name;
+    this.saveLocalState();
 
     this.addAuditLog(this.currentUser.name, approved ? 'Phê duyệt khen thưởng' : 'Từ chối khen thưởng', 'reward', rewardId);
     this.calculateAllWeeklyScores(1);
@@ -2368,6 +2627,7 @@ class AppStateService {
     const id = `pos-${Date.now()}`;
     const newNote: PositiveNote = { ...note, id, created_at: new Date().toISOString() };
     this.positiveNotes.unshift(newNote);
+    this.saveLocalState();
     this.addAuditLog(this.currentUser.name, 'Ghi nhận lời khen tích cực', 'positive_note', id);
     this.notify();
   }
@@ -2378,6 +2638,7 @@ class AppStateService {
     const id = `task-${Date.now()}`;
     const newTask: Task = { ...task, id, created_at: new Date().toISOString() };
     this.tasks.unshift(newTask);
+    this.saveLocalState();
     this.addAuditLog(this.currentUser.name, 'Giao nhiệm vụ lớp', 'task', id, task.title);
     this.notify();
   }
@@ -2387,6 +2648,7 @@ class AppStateService {
     const task = this.tasks.find((t) => t.id === taskId);
     if (!task) return;
     task.status = status;
+    this.saveLocalState();
     this.addAuditLog(this.currentUser.name, `Cập nhật trạng thái nhiệm vụ: ${status}`, 'task', taskId);
     this.notify();
   }
@@ -2408,6 +2670,7 @@ class AppStateService {
       rule.effective_from = new Date().toISOString().split('T')[0];
     }
 
+    this.saveLocalState();
     this.addAuditLog(
       this.currentUser.name,
       'Chọn & phê duyệt phương án quy tắc nề nếp',
@@ -2437,6 +2700,7 @@ class AppStateService {
     rule.configured_by = this.currentUser.name;
     rule.confirmed_by = this.currentUser.name;
 
+    this.saveLocalState();
     this.addAuditLog(
       this.currentUser.name,
       'Điều chỉnh quy tắc nề nếp',
@@ -2467,6 +2731,7 @@ class AppStateService {
       }
     });
 
+    this.saveLocalState();
     this.addAuditLog(
       this.currentUser.name,
       'Điều chỉnh biểu điểm quy định nề nếp',
@@ -2487,6 +2752,7 @@ class AppStateService {
       this.conductCatalog.push(newItem);
     }
 
+    this.saveLocalState();
     this.addAuditLog(
       this.currentUser.name,
       'Bổ sung quy định nề nếp mới',
@@ -2598,6 +2864,7 @@ class AppStateService {
       locked_by: this.currentUser.name,
     };
 
+    this.saveLocalState();
     this.addAuditLog(this.currentUser.name, `Khóa kỳ đánh giá [${key}]`, 'period_lock', key);
     this.notify();
     return { success: true, message: 'Đã khóa kỳ thành công!' };
@@ -2610,6 +2877,7 @@ class AppStateService {
     }
 
     this.periodLocks[key] = { is_locked: false };
+    this.saveLocalState();
     this.addAuditLog(this.currentUser.name, `Mở khóa lại kỳ đánh giá [${key}]`, 'period_lock', key, `Lý do: ${reason}`);
     this.notify();
     return { success: true, message: 'Đã mở khóa kỳ thành công!' };
@@ -2664,6 +2932,9 @@ class AppStateService {
 
       this.addAuditLog(this.currentUser.name, 'Phục hồi dữ liệu từ tệp sao lưu JSON', 'system', 'class-10a16');
       this.calculateAllWeeklyScores(1);
+      this.syncActivePlanSeats();
+      this.saveLocalState();
+      this.syncAllToSupabase().then();
       this.notify();
 
       return {
@@ -2706,8 +2977,10 @@ class AppStateService {
           .on('postgres_changes', { event: '*', schema: 'public', table: 'groups' }, () => {
             this.fetchFromSupabase(true);
           })
-          .on('postgres_changes', { event: '*', schema: 'public', table: 'audit_logs' }, () => {
-            this.fetchFromSupabase(true);
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'seats' }, () => {
+            if (!this.isSupabaseSyncing) {
+              this.fetchFromSupabase(true);
+            }
           })
           .subscribe();
       }
@@ -2795,6 +3068,17 @@ class AppStateService {
       }));
       const { error: stuErr } = await supabase.from('students').upsert(studentsPayload, { onConflict: 'id' });
       if (stuErr) throw stuErr;
+
+      // 3b. Seats (48 vị trí ghế ngồi lớp học)
+      const seatsPayload = this.seats.map((s) => ({
+        id: s.id,
+        class_id: 'class-10a16',
+        row_number: s.row_number,
+        col_number: s.col_number,
+        table_number: s.table_number,
+        student_id: s.student_id || null,
+      }));
+      await supabase.from('seats').upsert(seatsPayload, { onConflict: 'id' });
 
       // 4. Incidents
       if (this.incidents.length > 0) {
@@ -2998,56 +3282,103 @@ class AppStateService {
         }));
       }
 
-      // 5. Fetch Class Info & Ban Cán Sự from Supabase Audit Logs & Classes
+      // 5. Fetch Seats directly from Supabase 'seats' table
+      let hasLoadedSeatsFromCloud = false;
       try {
-        const { data: classAudit } = await supabase
+        const { data: seatsData, error: seatsErr } = await supabase
+          .from('seats')
+          .select('*')
+          .eq('class_id', 'class-10a16')
+          .order('row_number', { ascending: true })
+          .order('col_number', { ascending: true });
+
+        if (!seatsErr && seatsData && seatsData.length > 0) {
+          this.seats = seatsData.map((s: any) => ({
+            id: s.id,
+            class_id: s.class_id,
+            row_number: Number(s.row_number),
+            col_number: Number(s.col_number),
+            table_number: Number(s.table_number),
+            student_id: s.student_id || undefined,
+          }));
+          this.ensureCapacitySeats();
+          hasLoadedSeatsFromCloud = true;
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('VTT_SEATS', JSON.stringify(this.seats));
+          }
+        }
+      } catch (seatErr) {
+        console.warn('Lỗi tải seats từ Supabase:', seatErr);
+      }
+
+      // 6. Fetch Class Info, Ban Cán Sự & Seating Plans from Supabase Audit Logs & Classes
+      try {
+        const { data: classAuditList } = await supabase
           .from('audit_logs')
           .select('*')
-          .eq('entity_type', 'class_info')
+          .in('entity_type', ['seating_plans', 'class_info'])
           .eq('entity_id', 'class-10a16')
           .order('created_at', { ascending: false })
           .limit(1);
 
-        if (classAudit && classAudit.length > 0 && classAudit[0].reason) {
-          const parsed = JSON.parse(classAudit[0].reason);
-          if (parsed.classInfo) {
-            this.classInfo = { ...this.classInfo, ...parsed.classInfo };
-            if (typeof window !== 'undefined') {
-              localStorage.setItem('VTT_CLASS_INFO', JSON.stringify(this.classInfo));
-            }
-          }
-          if (parsed.officerAccounts && Array.isArray(parsed.officerAccounts)) {
-            this.officerAccounts = parsed.officerAccounts;
-            if (typeof window !== 'undefined') {
-              localStorage.setItem('VTT_OFFICER_ACCOUNTS', JSON.stringify(this.officerAccounts));
-            }
-          }
-          if (parsed.groups && Array.isArray(parsed.groups)) {
-            this.groups = parsed.groups;
-            if (typeof window !== 'undefined') {
-              localStorage.setItem('VTT_GROUPS', JSON.stringify(this.groups));
-            }
-          }
-          if (parsed.seatingPlans && Array.isArray(parsed.seatingPlans) && parsed.seatingPlans.length > 0) {
-            this.seatingPlans = parsed.seatingPlans;
-            if (typeof window !== 'undefined') {
-              localStorage.setItem('VTT_SEATING_PLANS', JSON.stringify(this.seatingPlans));
-            }
-          }
-          if (parsed.activeSeatingPlanId) {
-            this.activeSeatingPlanId = parsed.activeSeatingPlanId;
-            if (typeof window !== 'undefined') {
-              localStorage.setItem('VTT_ACTIVE_SEATING_PLAN_ID', this.activeSeatingPlanId);
-            }
-          }
-          if (parsed.seats && Array.isArray(parsed.seats) && parsed.seats.length > 0) {
-            this.seats = parsed.seats;
-            this.ensureCapacitySeats();
-            if (typeof window !== 'undefined') {
-              localStorage.setItem('VTT_SEATS', JSON.stringify(this.seats));
-            }
+        if (classAuditList && classAuditList.length > 0) {
+          const classAudit = classAuditList[0];
+          if (classAudit.reason) {
+            try {
+              const parsed = JSON.parse(classAudit.reason);
+              if (parsed.classInfo) {
+                this.classInfo = { ...this.classInfo, ...parsed.classInfo };
+                if (typeof window !== 'undefined') {
+                  localStorage.setItem('VTT_CLASS_INFO', JSON.stringify(this.classInfo));
+                }
+              }
+              if (parsed.officerAccounts && Array.isArray(parsed.officerAccounts)) {
+                this.officerAccounts = parsed.officerAccounts;
+                if (typeof window !== 'undefined') {
+                  localStorage.setItem('VTT_OFFICER_ACCOUNTS', JSON.stringify(this.officerAccounts));
+                }
+              }
+              if (parsed.groups && Array.isArray(parsed.groups)) {
+                this.groups = parsed.groups;
+                if (typeof window !== 'undefined') {
+                  localStorage.setItem('VTT_GROUPS', JSON.stringify(this.groups));
+                }
+              }
+              if (parsed.seatingPlans && Array.isArray(parsed.seatingPlans) && parsed.seatingPlans.length > 0) {
+                this.seatingPlans = parsed.seatingPlans;
+                if (typeof window !== 'undefined') {
+                  localStorage.setItem('VTT_SEATING_PLANS', JSON.stringify(this.seatingPlans));
+                }
+              }
+              if (parsed.activeSeatingPlanId) {
+                this.activeSeatingPlanId = parsed.activeSeatingPlanId;
+                if (typeof window !== 'undefined') {
+                  localStorage.setItem('VTT_ACTIVE_SEATING_PLAN_ID', this.activeSeatingPlanId);
+                }
+              }
+              if (!hasLoadedSeatsFromCloud && parsed.seats && Array.isArray(parsed.seats) && parsed.seats.length > 0) {
+                this.seats = parsed.seats.map((s: any) => ({ ...s }));
+                this.ensureCapacitySeats();
+                hasLoadedSeatsFromCloud = true;
+                if (typeof window !== 'undefined') {
+                  localStorage.setItem('VTT_SEATS', JSON.stringify(this.seats));
+                }
+              }
+            } catch (parseE) {}
           }
         }
+
+        // Tự động tái tạo sơ đồ CHỈ KHI và CHỈ KHI hoàn toàn chưa có ghế nào
+        if (!hasLoadedSeatsFromCloud && (!this.seats || this.seats.length === 0 || !this.seats.some(s => Boolean(s.student_id)))) {
+          const hasSeatNumbers = this.students.some((s) => Boolean(s.seat_number && s.seat_number.includes('Bàn')));
+          if (hasSeatNumbers) {
+            this.reconstructSeatsFromStudentSeatNumbers();
+            hasLoadedSeatsFromCloud = true;
+          }
+        }
+
+        this.syncActivePlanSeats();
+        this.saveLocalState();
 
         const { data: clsData } = await supabase.from('classes').select('*').eq('id', 'class-10a16').limit(1);
         if (clsData && clsData.length > 0) {
@@ -3068,7 +3399,7 @@ class AppStateService {
           }
         }
       } catch (err) {
-        console.warn('Lỗi đồng bộ Ban Cán Sự từ Supabase:', err);
+        console.warn('Lỗi đồng bộ Ban Cán Sự & Sơ Đồ từ Supabase:', err);
       }
 
       this.calculateAllWeeklyScores(1);

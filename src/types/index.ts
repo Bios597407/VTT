@@ -245,3 +245,21 @@ export interface AuditLog {
   reason?: string;
   timestamp: string;
 }
+
+export interface QualitativeComment {
+  id: string;
+  studentId: string;
+  author: string;
+  content: string;
+  date: string;
+}
+
+export interface SupportPlan {
+  id: string;
+  studentId: string;
+  objective: string;
+  plan: string;
+  status: string;
+  date?: string;
+}
+
