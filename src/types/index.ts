@@ -250,8 +250,11 @@ export interface QualitativeComment {
   id: string;
   studentId: string;
   author: string;
+  authorRole?: string;
+  category: 'teacher' | 'self' | 'group' | 'parent';
   content: string;
   date: string;
+  created_at?: string;
 }
 
 export interface SupportPlan {
@@ -259,7 +262,9 @@ export interface SupportPlan {
   studentId: string;
   objective: string;
   plan: string;
-  status: string;
+  status: 'Đang thực hiện' | 'Hoàn thành' | 'Cần điều chỉnh' | 'Tạm dừng';
+  teacher_name?: string;
   date?: string;
+  created_at?: string;
 }
 

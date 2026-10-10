@@ -22,6 +22,8 @@ import {
   RoleType,
   SeatingPlan,
   DutyRosterDay,
+  QualitativeComment,
+  SupportPlan,
 } from '../types';
 import { PRIVATE_ROSTER_10A16 } from '../lib/privateRosterLoader';
 import { OFFICIAL_PENDING_RULES } from '../domain/scoring/pendingRules';
@@ -269,6 +271,8 @@ class AppStateService {
   public attendance: AttendanceRecord[] = [];
   public tasks: Task[] = [];
   public positiveNotes: PositiveNote[] = [];
+  public qualitativeComments: QualitativeComment[] = [];
+  public supportPlans: SupportPlan[] = [];
   public pendingRules: PendingRule[] = JSON.parse(JSON.stringify(OFFICIAL_PENDING_RULES));
   public conductCatalog: ConductCatalogItem[] = JSON.parse(JSON.stringify(OFFICIAL_CONDUCT_CATALOG));
 
@@ -758,6 +762,78 @@ class AppStateService {
           if (Array.isArray(parsed)) this.positiveNotes = parsed;
         }
 
+        const savedQualitativeComments = localStorage.getItem('VTT_QUALITATIVE_COMMENTS');
+        if (savedQualitativeComments) {
+          const parsed = JSON.parse(savedQualitativeComments);
+          if (Array.isArray(parsed)) this.qualitativeComments = parsed;
+        } else {
+          this.qualitativeComments = [
+            {
+              id: 'qc-01',
+              studentId: this.students[0]?.id || 'stu-01',
+              author: 'Thầy Trần Duy Tân (GVCN)',
+              authorRole: 'gvcn',
+              category: 'teacher',
+              content: 'Học sinh có ý thức kỷ luật tốt, năng nổ tham gia các phong trào chung của chi đoàn.',
+              date: '2026-10-05',
+            },
+            {
+              id: 'qc-02',
+              studentId: this.students[0]?.id || 'stu-01',
+              author: 'Trần Đức Anh',
+              authorRole: 'hoc_sinh',
+              category: 'self',
+              content: 'Bản thân em nhận thấy tuần qua chấp hành đúng nội quy, chưa bị ghi nhận vi phạm.',
+              date: '2026-10-06',
+            },
+            {
+              id: 'qc-03',
+              studentId: this.students[1]?.id || 'stu-02',
+              author: 'Tổ trưởng Tổ 1',
+              authorRole: 'to_truong',
+              category: 'group',
+              content: 'Tổ đánh giá bạn có tinh thần làm việc nhóm tốt, giữ vệ sinh chỗ ngồi sạch sẽ.',
+              date: '2026-10-07',
+            },
+            {
+              id: 'qc-04',
+              studentId: this.students[2]?.id || 'stu-03',
+              author: 'Phụ huynh HS',
+              authorRole: 'parent',
+              category: 'parent',
+              content: 'Gia đình đã đôn đốc cháu tự giác chuẩn bị bài vở và đi học đúng giờ mỗi sáng.',
+              date: '2026-10-08',
+            },
+          ];
+        }
+
+        const savedSupportPlans = localStorage.getItem('VTT_SUPPORT_PLANS');
+        if (savedSupportPlans) {
+          const parsed = JSON.parse(savedSupportPlans);
+          if (Array.isArray(parsed)) this.supportPlans = parsed;
+        } else {
+          this.supportPlans = [
+            {
+              id: 'sp-01',
+              studentId: this.students[1]?.id || 'stu-02',
+              objective: 'Cải thiện nề nếp đi học đúng giờ trước 06:45',
+              plan: 'Phối hợp phụ huynh nhắc nhở, xếp ngồi cạnh lớp trưởng để hỗ trợ đôn đốc',
+              status: 'Đang thực hiện',
+              teacher_name: 'Thầy Trần Duy Tân (GVCN)',
+              date: '2026-10-05',
+            },
+            {
+              id: 'sp-02',
+              studentId: this.students[3]?.id || 'stu-04',
+              objective: 'Đeo bảng tên & trang phục chỉnh tề khi đến trường',
+              plan: 'Ban cán sự lớp kiểm tra đầu giờ, thông báo tổ trưởng đôn đốc trước khi xếp hàng',
+              status: 'Cần điều chỉnh',
+              teacher_name: 'Thầy Trần Duy Tân (GVCN)',
+              date: '2026-10-06',
+            },
+          ];
+        }
+
         const savedPendingRules = localStorage.getItem('VTT_PENDING_RULES');
         if (savedPendingRules) {
           const parsed = JSON.parse(savedPendingRules);
@@ -1057,6 +1133,8 @@ class AppStateService {
       localStorage.setItem('VTT_WEEKLY_DUTY_OVERRIDES', JSON.stringify(this.weeklyDutyOverrides));
       localStorage.setItem('VTT_TASKS', JSON.stringify(this.tasks));
       localStorage.setItem('VTT_POSITIVE_NOTES', JSON.stringify(this.positiveNotes));
+      localStorage.setItem('VTT_QUALITATIVE_COMMENTS', JSON.stringify(this.qualitativeComments));
+      localStorage.setItem('VTT_SUPPORT_PLANS', JSON.stringify(this.supportPlans));
       localStorage.setItem('VTT_PENDING_RULES', JSON.stringify(this.pendingRules));
       localStorage.setItem('VTT_CONDUCT_CATALOG', JSON.stringify(this.conductCatalog));
       localStorage.setItem('VTT_WEEKLY_SNAPSHOTS', JSON.stringify(this.weeklySnapshots));
@@ -3070,6 +3148,109 @@ class AppStateService {
     this.positiveNotes.unshift(newNote);
     this.saveLocalState();
     this.addAuditLog(this.currentUser.name, 'Ghi nhận lời khen tích cực', 'positive_note', id);
+    this.notify();
+  }
+
+  public updatePositiveNote(id: string, updated: Partial<PositiveNote>) {
+    if (!this.checkWriteAuthorization()) return;
+    const index = this.positiveNotes.findIndex((n) => n.id === id);
+    if (index >= 0) {
+      this.positiveNotes[index] = { ...this.positiveNotes[index], ...updated };
+      this.saveLocalState();
+      this.addAuditLog(this.currentUser.name, 'Chỉnh sửa lời khen tích cực', 'positive_note', id);
+      this.notify();
+    }
+  }
+
+  public deletePositiveNote(id: string) {
+    if (!this.checkWriteAuthorization()) return;
+    this.positiveNotes = this.positiveNotes.filter((n) => n.id !== id);
+    this.saveLocalState();
+    this.addAuditLog(this.currentUser.name, 'Xóa lời khen tích cực', 'positive_note', id);
+    this.notify();
+  }
+
+  // --- Rewards Edit & Delete ---
+  public updateReward(id: string, updated: Partial<RewardRecord>) {
+    if (!this.checkWriteAuthorization()) return;
+    const index = this.rewards.findIndex((r) => r.id === id);
+    if (index >= 0) {
+      this.rewards[index] = { ...this.rewards[index], ...updated };
+      this.calculateAllWeeklyScores(0, true);
+      this.saveLocalState();
+      this.addAuditLog(this.currentUser.name, 'Chỉnh sửa điểm khen thưởng', 'reward', id);
+      this.notify();
+    }
+  }
+
+  public deleteReward(id: string) {
+    if (!this.checkWriteAuthorization()) return;
+    this.rewards = this.rewards.filter((r) => r.id !== id);
+    this.calculateAllWeeklyScores(0, true);
+    this.saveLocalState();
+    this.addAuditLog(this.currentUser.name, 'Xóa ghi nhận khen thưởng', 'reward', id);
+    this.notify();
+  }
+
+  // --- Qualitative Comments CRUD ---
+  public addQualitativeComment(comment: Omit<QualitativeComment, 'id' | 'created_at'>) {
+    if (!this.checkWriteAuthorization()) return;
+    const id = `qc-${Date.now()}`;
+    const newComment: QualitativeComment = { ...comment, id, created_at: new Date().toISOString() };
+    this.qualitativeComments.unshift(newComment);
+    this.saveLocalState();
+    this.addAuditLog(this.currentUser.name, 'Thêm nhận xét định tính', 'qualitative_comment', id);
+    this.notify();
+    return newComment;
+  }
+
+  public updateQualitativeComment(id: string, updated: Partial<QualitativeComment>) {
+    if (!this.checkWriteAuthorization()) return;
+    const index = this.qualitativeComments.findIndex((c) => c.id === id);
+    if (index >= 0) {
+      this.qualitativeComments[index] = { ...this.qualitativeComments[index], ...updated };
+      this.saveLocalState();
+      this.addAuditLog(this.currentUser.name, 'Chỉnh sửa nhận xét định tính', 'qualitative_comment', id);
+      this.notify();
+    }
+  }
+
+  public deleteQualitativeComment(id: string) {
+    if (!this.checkWriteAuthorization()) return;
+    this.qualitativeComments = this.qualitativeComments.filter((c) => c.id !== id);
+    this.saveLocalState();
+    this.addAuditLog(this.currentUser.name, 'Xóa nhận xét định tính', 'qualitative_comment', id);
+    this.notify();
+  }
+
+  // --- Support Plans CRUD ---
+  public addSupportPlan(plan: Omit<SupportPlan, 'id' | 'created_at'>) {
+    if (!this.checkWriteAuthorization()) return;
+    const id = `sp-${Date.now()}`;
+    const newPlan: SupportPlan = { ...plan, id, created_at: new Date().toISOString() };
+    this.supportPlans.unshift(newPlan);
+    this.saveLocalState();
+    this.addAuditLog(this.currentUser.name, 'Thêm kế hoạch hỗ trợ sư phạm', 'support_plan', id);
+    this.notify();
+    return newPlan;
+  }
+
+  public updateSupportPlan(id: string, updated: Partial<SupportPlan>) {
+    if (!this.checkWriteAuthorization()) return;
+    const index = this.supportPlans.findIndex((p) => p.id === id);
+    if (index >= 0) {
+      this.supportPlans[index] = { ...this.supportPlans[index], ...updated };
+      this.saveLocalState();
+      this.addAuditLog(this.currentUser.name, 'Chỉnh sửa kế hoạch hỗ trợ', 'support_plan', id);
+      this.notify();
+    }
+  }
+
+  public deleteSupportPlan(id: string) {
+    if (!this.checkWriteAuthorization()) return;
+    this.supportPlans = this.supportPlans.filter((p) => p.id !== id);
+    this.saveLocalState();
+    this.addAuditLog(this.currentUser.name, 'Xóa kế hoạch hỗ trợ', 'support_plan', id);
     this.notify();
   }
 
