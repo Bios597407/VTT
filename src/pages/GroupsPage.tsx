@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { appState } from '../services/appStateService';
 import { Group, Student } from '../types';
-import { Users, Shield, Plus, Check, Edit3, ArrowRightLeft, UserCheck, X } from 'lucide-react';
+import { Users, Shield, Plus, Check, Edit3, ArrowRightLeft, UserCheck, X, Trophy, Award, Calendar, AlertCircle, ShieldCheck } from 'lucide-react';
+import { getWeekDateRange } from '../domain/scoring/scoringEngine';
 
 export const GroupsPage: React.FC = () => {
   const groups = appState.groups;
@@ -9,6 +10,7 @@ export const GroupsPage: React.FC = () => {
   const currentUser = appState.currentUser;
 
   const [activeGroupId, setActiveGroupId] = useState(groups[0]?.id || 'group-01');
+  const [selectedWeek, setSelectedWeek] = useState<number>(1);
 
   // Modals state
   const [showEditGroupModal, setShowEditGroupModal] = useState(false);
@@ -155,6 +157,122 @@ export const GroupsPage: React.FC = () => {
           );
         })}
       </div>
+
+      {/* Weekly Group Competition & Ranking Board */}
+      {(() => {
+        const groupScores = appState.getGroupWeeklyScores(selectedWeek);
+        const range = getWeekDateRange(selectedWeek);
+        const topScore = groupScores[0]?.score ?? 8.0;
+
+        return (
+          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-amber-50 text-amber-700 rounded-xl border border-amber-200">
+                  <Trophy className="w-5 h-5 text-amber-600" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-slate-900 flex items-center gap-2">
+                    Bảng Thi Đưa & Xếp Loại Các Tổ Trong Tuần
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Điểm trung bình Tổ = Tổng điểm tuần 43 học sinh / Số sĩ số mỗi Tổ. Điểm trừ vi phạm của học sinh được liên kết trực tiếp để hạ điểm thi đua của Tổ.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-blue-600 shrink-0" />
+                <span className="text-xs font-bold text-slate-700">Tuần:</span>
+                <select
+                  value={selectedWeek}
+                  onChange={(e) => setSelectedWeek(Number(e.target.value))}
+                  className="px-3 py-1.5 bg-white border border-slate-300 rounded-xl font-bold text-xs text-blue-800 shadow-xs cursor-pointer focus:ring-2 focus:ring-blue-500"
+                >
+                  {Array.from({ length: 18 }, (_, i) => i + 1).map((w) => {
+                    const r = getWeekDateRange(w);
+                    return (
+                      <option key={w} value={w}>
+                        {r.optionLabel}
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+            </div>
+
+            {/* Ranking Cards Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              {groupScores.map((item) => {
+                const isLeading = item.rank === 1 && item.score === topScore && item.violationsCount === 0;
+                const hasViolations = item.violationsCount > 0;
+
+                return (
+                  <div
+                    key={item.id}
+                    onClick={() => setActiveGroupId(item.id)}
+                    className={`p-4 rounded-2xl border transition cursor-pointer relative overflow-hidden ${
+                      isLeading
+                        ? 'bg-gradient-to-br from-amber-500/10 via-amber-50/30 to-white border-amber-300 shadow-xs'
+                        : hasViolations
+                        ? 'bg-slate-50/80 border-slate-200'
+                        : 'bg-white border-slate-200'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-extrabold font-mono text-slate-500">
+                        HẠNG #{item.rank}
+                      </span>
+                      {isLeading ? (
+                        <span className="px-2 py-0.5 bg-amber-100 text-amber-900 border border-amber-300 text-[10px] font-extrabold rounded-full flex items-center gap-1">
+                          <Trophy className="w-3 h-3 text-amber-600" /> Dẫn đầu
+                        </span>
+                      ) : hasViolations ? (
+                        <span className="px-2 py-0.5 bg-rose-100 text-rose-800 border border-rose-200 text-[10px] font-bold rounded-full flex items-center gap-1">
+                          <AlertCircle className="w-3 h-3 text-rose-600" /> Có vi phạm
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold rounded-full flex items-center gap-1">
+                          <ShieldCheck className="w-3 h-3 text-emerald-600" /> Nề nếp tốt
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="mt-2 flex items-baseline justify-between">
+                      <span className="font-extrabold text-sm text-slate-900">{item.group_name}</span>
+                      <div className="text-right">
+                        <span className="text-lg font-black font-mono text-blue-700">{item.score.toFixed(1)}</span>
+                        <span className="text-xs text-slate-500 font-bold">/10</span>
+                      </div>
+                    </div>
+
+                    <div className="mt-2 border-t border-slate-100 pt-2 grid grid-cols-2 gap-1 text-[11px]">
+                      <div>
+                        <span className="text-slate-500">Sĩ số:</span>{' '}
+                        <span className="font-bold text-slate-800">{item.studentCount} HS</span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-slate-500">Lượt vi phạm:</span>{' '}
+                        <span className={`font-bold ${hasViolations ? 'text-rose-700 font-mono' : 'text-slate-800'}`}>
+                          {item.violationsCount}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-slate-500">Điểm thưởng:</span>{' '}
+                        <span className="font-bold text-emerald-700 font-mono">+{item.rewardsCount}</span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-slate-500">Điểm trừ:</span>{' '}
+                        <span className="font-bold text-rose-700 font-mono">-{item.totalDeduction}</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Selected Group details & members */}
       {selectedGroup && (

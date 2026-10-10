@@ -532,7 +532,7 @@ class AppStateService {
 
   constructor() {
     this.initDefaultSeats();
-    this.calculateAllWeeklyScores(1);
+    this.calculateAllWeeklyScores(0);
 
     // Thiết lập kích thước chữ mặc định hoặc khôi phục từ LocalStorage
     if (typeof window !== 'undefined') {
@@ -1237,7 +1237,7 @@ class AppStateService {
       if (parsed.periodLocks && typeof parsed.periodLocks === 'object') this.periodLocks = parsed.periodLocks;
       if (Array.isArray(parsed.auditLogs)) this.auditLogs = parsed.auditLogs;
 
-      this.calculateAllWeeklyScores(1);
+      this.calculateAllWeeklyScores(0);
       this.syncActivePlanSeats();
       this.saveLocalState();
       this.syncAllToSupabase().then();
@@ -1832,7 +1832,7 @@ class AppStateService {
     this.tasks = [];
     this.positiveNotes = [];
     this.initDefaultSeats();
-    this.calculateAllWeeklyScores(1);
+    this.calculateAllWeeklyScores(0);
     this.addAuditLog(this.currentUser.name, 'Làm sạch toàn bộ dữ liệu - Khởi tạo sổ nề nếp 10A16', 'system', 'class-10a16');
     this.notify();
   }
@@ -2011,7 +2011,7 @@ class AppStateService {
       id,
       `Học sinh: ${newStudent.full_name} (${newStudent.student_code})`
     );
-    this.calculateAllWeeklyScores(1);
+    this.calculateAllWeeklyScores(0);
     this.notify();
 
     if (supabase) {
@@ -2047,7 +2047,7 @@ class AppStateService {
       studentId,
       `Điều chỉnh hồ sơ: ${stu.full_name}`
     );
-    this.calculateAllWeeklyScores(1);
+    this.calculateAllWeeklyScores(0);
     this.notify();
 
     if (supabase) {
@@ -2083,7 +2083,7 @@ class AppStateService {
       studentId,
       `Đã xóa học sinh ${removed.full_name}`
     );
-    this.calculateAllWeeklyScores(1);
+    this.calculateAllWeeklyScores(0);
     this.notify();
 
     if (supabase) {
@@ -2550,6 +2550,88 @@ class AppStateService {
     this.notify();
   }
 
+  // --- Group Scoring & Rankings ---
+  public getGroupWeeklyScores(weekNumber: number = 1) {
+    this.calculateAllWeeklyScores(weekNumber);
+    const approvedIncidents = this.incidents.filter(
+      (i) => i.incident_status === 'approved' && getWeekNumberForDate(i.date) === weekNumber
+    );
+    const approvedRewards = this.rewards.filter(
+      (r) => r.status === 'approved' && getWeekNumberForDate(r.date) === weekNumber
+    );
+
+    const scores = this.groups.map((g) => {
+      const groupStudents = this.students.filter((s) => s.group_id === g.id);
+      if (groupStudents.length === 0) {
+        return {
+          id: g.id,
+          group_number: g.group_number,
+          group_name: g.group_name,
+          score: 8.0,
+          studentCount: 0,
+          violationsCount: 0,
+          rewardsCount: 0,
+          totalDeduction: 0,
+          group: g,
+        };
+      }
+
+      let totalScore = 0;
+      let totalViolations = 0;
+      let totalRewards = 0;
+      let totalDeduction = 0;
+
+      groupStudents.forEach((stu) => {
+        const stuIncidents = approvedIncidents.filter(
+          (i) => i.student_id === stu.id && i.score_effect_status === 'confirmed_effect'
+        );
+        const stuRewards = approvedRewards.filter((r) => r.student_id === stu.id);
+
+        const scoreRes = calculateWeeklyScore({
+          isCalculated: true,
+          incidents: stuIncidents,
+          rewards: stuRewards,
+        });
+
+        const stuScore = scoreRes.official_week_score ?? 8.0;
+        totalScore += stuScore;
+        totalViolations += stuIncidents.length;
+        totalRewards += stuRewards.length;
+        totalDeduction += Math.abs(scoreRes.total_deductions);
+      });
+
+      const avgScore = Number((totalScore / groupStudents.length).toFixed(2));
+      return {
+        id: g.id,
+        group_number: g.group_number,
+        group_name: g.group_name,
+        score: avgScore,
+        studentCount: groupStudents.length,
+        violationsCount: totalViolations,
+        rewardsCount: totalRewards,
+        totalDeduction,
+        group: g,
+      };
+    });
+
+    // Rigorous ranking algorithm:
+    // 1. Highest average score
+    // 2. Fewest violations
+    // 3. Smallest total deduction points
+    // 4. Most reward records
+    scores.sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      if (a.violationsCount !== b.violationsCount) return a.violationsCount - b.violationsCount;
+      if (a.totalDeduction !== b.totalDeduction) return a.totalDeduction - b.totalDeduction;
+      return b.rewardsCount - a.rewardsCount;
+    });
+
+    return scores.map((item, idx) => ({
+      ...item,
+      rank: idx + 1,
+    }));
+  }
+
   // --- Zalo Weekly Report Generator ---
   public generateZaloWeeklyReport(weekNumber: number = 1, customNotes: string = '', showViolatorNames: boolean = true): string {
     const classInfo = this.classInfo;
@@ -2566,22 +2648,12 @@ class AppStateService {
     const approvedIncidents = this.incidents.filter((i) => i.incident_status === 'approved' && getWeekNumberForDate(i.date) === weekNumber);
     const approvedRewards = this.rewards.filter((r) => r.status === 'approved' && getWeekNumberForDate(r.date) === weekNumber);
 
-    // Group scores calculation
-    const weeklySnaps = this.weeklySnapshots.filter((s) => s.week_number === weekNumber && s.is_current);
-    const groupScores = this.groups.map((g) => {
-      const groupStudents = this.students.filter((s) => s.group_id === g.id);
-      if (groupStudents.length === 0) return { name: g.group_name, score: 8.0 };
-      const totalScore = groupStudents.reduce((acc, stu) => {
-        const snap = weeklySnaps.find((s) => s.student_id === stu.id);
-        return acc + (snap?.official_week_score ?? 8.0);
-      }, 0);
-      return {
-        name: g.group_name,
-        score: Number((totalScore / groupStudents.length).toFixed(1)),
-      };
-    }).sort((a, b) => b.score - a.score);
-
-    const topGroup = groupScores[0];
+    // Group scores calculation dynamically linked with student deductions & clean group priority
+    const groupScores = this.getGroupWeeklyScores(weekNumber);
+    const topScore = groupScores[0]?.score ?? 8.0;
+    const topGroups = groupScores.filter((g) => g.score === topScore);
+    const cleanTopGroups = topGroups.filter((g) => g.violationsCount === 0);
+    const selectedTopGroups = cleanTopGroups.length > 0 ? cleanTopGroups : topGroups;
 
     let text = `📣 [BÁO CÁO NỀ NẾP & THI ĐƯA TUẦN ${weekNumber}]\n`;
     text += `🗓️ THỜI GIAN: ${range.fullRangeText.toUpperCase()}\n`;
@@ -2595,8 +2667,12 @@ class AppStateService {
     text += `• Đi trễ / Trốn tiết: ${totalLates} lượt\n\n`;
 
     text += `🏆 2. THI ĐƯA TỔ & TUYÊN DƯƠNG:\n`;
-    if (topGroup) {
-      text += `• 🥇 Tổ dẫn đầu tuần: ${topGroup.name} (Điểm TB: ${topGroup.score}/10)\n`;
+    if (selectedTopGroups.length === 1) {
+      const top = selectedTopGroups[0];
+      text += `• 🥇 Tổ dẫn đầu tuần: ${top.group_name} (Điểm TB: ${top.score}/10${top.violationsCount > 0 ? `, ${top.violationsCount} lượt vi phạm` : ''})\n`;
+    } else if (selectedTopGroups.length > 1) {
+      const names = selectedTopGroups.map((g) => g.group_name).join(', ');
+      text += `• 🥇 Tổ dẫn đầu tuần: ${names} (Đồng dẫn đầu - Điểm TB: ${topScore}/10)\n`;
     }
     if (approvedRewards.length > 0) {
       const names = approvedRewards.map((r) => {
@@ -2774,7 +2850,7 @@ class AppStateService {
       `Mã: ${incidentData.conduct_code || 'Sự việc khác'}. Trạng thái: ${newIncident.incident_status}`
     );
 
-    this.calculateAllWeeklyScores(1);
+    this.calculateAllWeeklyScores(0);
     this.notify();
 
     if (supabase) {
@@ -2836,7 +2912,7 @@ class AppStateService {
       `Hiệu lực điểm: ${scoreEffectStatus}. Nhận xét: ${comment || 'Đã kiểm tra'}`
     );
 
-    this.calculateAllWeeklyScores(1);
+    this.calculateAllWeeklyScores(0);
     this.notify();
 
     if (supabase) {
@@ -2874,7 +2950,7 @@ class AppStateService {
       `Cập nhật chi tiết sự việc bởi ${this.currentUser.name}`
     );
 
-    this.calculateAllWeeklyScores(1);
+    this.calculateAllWeeklyScores(0);
     this.notify();
 
     if (supabase) {
@@ -2911,7 +2987,7 @@ class AppStateService {
       `Đã xóa bản ghi vi phạm của học sinh ${removed.student_id}`
     );
 
-    this.calculateAllWeeklyScores(1);
+    this.calculateAllWeeklyScores(0);
     this.notify();
 
     if (supabase) {
@@ -2939,7 +3015,7 @@ class AppStateService {
     this.rewards.unshift(newRew);
     this.saveLocalState();
     this.addAuditLog(this.currentUser.name, 'Đề xuất khen thưởng nề nếp', 'reward', id, `Mã: ${reward.reward_code} (+${reward.points}đ)`);
-    this.calculateAllWeeklyScores(1);
+    this.calculateAllWeeklyScores(0);
     this.notify();
 
     if (supabase) {
@@ -2975,7 +3051,7 @@ class AppStateService {
     this.saveLocalState();
 
     this.addAuditLog(this.currentUser.name, approved ? 'Phê duyệt khen thưởng' : 'Từ chối khen thưởng', 'reward', rewardId);
-    this.calculateAllWeeklyScores(1);
+    this.calculateAllWeeklyScores(0);
     this.notify();
 
     if (supabase) {
@@ -3106,7 +3182,7 @@ class AppStateService {
       `Cập nhật mã ${code}: Điểm trừ ${item.defaultPoints}đ. Mô tả: ${item.title}`
     );
 
-    this.calculateAllWeeklyScores(1);
+    this.calculateAllWeeklyScores(0);
     this.notify();
   }
 
@@ -3131,7 +3207,7 @@ class AppStateService {
   }
 
   // --- Scoring & Snapshot Calculations ---
-  public calculateAllWeeklyScores(weekNumber: number = 1) {
+  public calculateAllWeeklyScores(weekNumber: number = 0) {
     // Calculate for target week OR all weeks if 0 passed
     const weeksToCalculate = weekNumber > 0 ? [weekNumber] : Array.from({ length: 36 }, (_, i) => i + 1);
 
@@ -3297,7 +3373,7 @@ class AppStateService {
       this.auditLogs = data.auditLogs || [];
 
       this.addAuditLog(this.currentUser.name, 'Phục hồi dữ liệu từ tệp sao lưu JSON', 'system', 'class-10a16');
-      this.calculateAllWeeklyScores(1);
+      this.calculateAllWeeklyScores(0);
       this.syncActivePlanSeats();
       this.saveLocalState();
       this.syncAllToSupabase().then();
@@ -3771,7 +3847,7 @@ class AppStateService {
         console.warn('Lỗi đồng bộ Ban Cán Sự & Sơ Đồ từ Supabase:', err);
       }
 
-      this.calculateAllWeeklyScores(1);
+      this.calculateAllWeeklyScores(0);
       this.lastSupabaseSyncTime = new Date().toLocaleTimeString('vi-VN');
       this.isSupabaseSyncing = false;
       this.notify();
