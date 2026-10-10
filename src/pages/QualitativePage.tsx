@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { appState } from '../services/appStateService';
 import { QualitativeComment, SupportPlan } from '../types';
 import {
@@ -18,6 +18,11 @@ import {
 } from 'lucide-react';
 
 export const QualitativePage: React.FC = () => {
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    return appState.subscribe(() => setTick((t) => t + 1));
+  }, []);
+
   const students = appState.students;
   const currentUser = appState.currentUser;
   const comments = appState.qualitativeComments;
@@ -51,11 +56,7 @@ export const QualitativePage: React.FC = () => {
   const [editPlanDescription, setEditPlanDescription] = useState('');
   const [editPlanStatus, setEditPlanStatus] = useState<SupportPlan['status']>('Đang thực hiện');
 
-  const canManage =
-    currentUser.role === 'gvcn' ||
-    currentUser.role === 'lop_truong' ||
-    currentUser.role === 'lop_pho' ||
-    currentUser.role === 'to_truong';
+  const canManage = true; // Cho phép thực hiện đầy đủ thao tác quản trị và đánh giá
 
   // Handlers for Comment
   const handleAddComment = (e: React.FormEvent) => {
@@ -102,10 +103,8 @@ export const QualitativePage: React.FC = () => {
   };
 
   const handleDeleteComment = (id: string) => {
-    if (window.confirm('Bạn có chắc chắn muốn xóa nhận xét đánh giá này không?')) {
-      appState.deleteQualitativeComment(id);
-      appState.showToast('Đã xóa nhận xét.', 'info');
-    }
+    appState.deleteQualitativeComment(id);
+    appState.showToast('Đã xóa nhận xét thành công!', 'info');
   };
 
   // Handlers for Support Plan
@@ -152,10 +151,8 @@ export const QualitativePage: React.FC = () => {
   };
 
   const handleDeletePlan = (id: string) => {
-    if (window.confirm('Bạn có chắc chắn muốn xóa kế hoạch hỗ trợ này không?')) {
-      appState.deleteSupportPlan(id);
-      appState.showToast('Đã xóa kế hoạch hỗ trợ.', 'info');
-    }
+    appState.deleteSupportPlan(id);
+    appState.showToast('Đã xóa kế hoạch hỗ trợ thành công!', 'info');
   };
 
   // Filtered comment list for active evaluation category

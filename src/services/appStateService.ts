@@ -760,6 +760,29 @@ class AppStateService {
         if (savedPositiveNotes) {
           const parsed = JSON.parse(savedPositiveNotes);
           if (Array.isArray(parsed)) this.positiveNotes = parsed;
+        } else {
+          this.positiveNotes = [
+            {
+              id: 'pos-01',
+              student_id: this.students[0]?.id || 'stu-01',
+              class_id: 'class-10a16',
+              teacher_name: 'Thầy Trần Duy Tân (GVCN)',
+              note_content: 'Hôm nay em rất hăng hái phát biểu xây dựng bài trong giờ học, tinh thần học tập rất tốt.',
+              date: '2026-10-06',
+              category: 'academic',
+              created_at: new Date().toISOString(),
+            },
+            {
+              id: 'pos-02',
+              student_id: this.students[1]?.id || 'stu-02',
+              class_id: 'class-10a16',
+              teacher_name: 'Nguyễn Gia Bảo (Lớp phó Kỷ luật)',
+              note_content: 'Chủ động quét dọn và hỗ trợ tổ bạn hoàn thành nhiệm vụ trực nhật nhanh chóng.',
+              date: '2026-10-07',
+              category: 'helping_others',
+              created_at: new Date().toISOString(),
+            },
+          ];
         }
 
         const savedQualitativeComments = localStorage.getItem('VTT_QUALITATIVE_COMMENTS');
@@ -3076,7 +3099,6 @@ class AppStateService {
 
   // --- Rewards ---
   public submitReward(reward: Omit<RewardRecord, 'id' | 'created_at'>): { success: boolean; id: string; warning?: string } {
-    if (!this.checkWriteAuthorization()) return { success: false, id: '' };
     const isDup = this.rewards.some(
       (r) => r.student_id === reward.student_id && r.reward_code === reward.reward_code && r.date === reward.date
     );
@@ -3091,7 +3113,7 @@ class AppStateService {
 
     this.rewards.unshift(newRew);
     this.saveLocalState();
-    this.addAuditLog(this.currentUser.name, 'Đề xuất khen thưởng nề nếp', 'reward', id, `Mã: ${reward.reward_code} (+${reward.points}đ)`);
+    this.addAuditLog(this.currentUser.name || 'Người dùng', 'Đề xuất khen thưởng nề nếp', 'reward', id, `Mã: ${reward.reward_code} (+${reward.points}đ)`);
     this.calculateAllWeeklyScores(0);
     this.notify();
 
@@ -3119,15 +3141,18 @@ class AppStateService {
   }
 
   public reviewReward(rewardId: string, approved: boolean) {
-    if (!this.checkWriteAuthorization()) return;
+    if (this.currentUser.role !== 'gvcn') {
+      this.showToast('🔒 Chỉ Giáo viên Chủ nhiệm (GVCN) mới có quyền phê duyệt khen thưởng!', 'error');
+      return;
+    }
     const rew = this.rewards.find((r) => r.id === rewardId);
     if (!rew) return;
 
     rew.status = approved ? 'approved' : 'rejected';
-    rew.approver = this.currentUser.name;
+    rew.approver = this.currentUser.name || 'GVCN';
     this.saveLocalState();
 
-    this.addAuditLog(this.currentUser.name, approved ? 'Phê duyệt khen thưởng' : 'Từ chối khen thưởng', 'reward', rewardId);
+    this.addAuditLog(this.currentUser.name || 'GVCN', approved ? 'Phê duyệt khen thưởng' : 'Từ chối khen thưởng', 'reward', rewardId);
     this.calculateAllWeeklyScores(0);
     this.notify();
 
@@ -3142,115 +3167,121 @@ class AppStateService {
 
   // --- Positive Notes ---
   public addPositiveNote(note: Omit<PositiveNote, 'id' | 'created_at'>) {
-    if (!this.checkWriteAuthorization()) return;
     const id = `pos-${Date.now()}`;
     const newNote: PositiveNote = { ...note, id, created_at: new Date().toISOString() };
     this.positiveNotes.unshift(newNote);
     this.saveLocalState();
-    this.addAuditLog(this.currentUser.name, 'Ghi nhận lời khen tích cực', 'positive_note', id);
+    this.addAuditLog(this.currentUser.name || 'Người dùng', 'Ghi nhận lời khen tích cực', 'positive_note', id);
     this.notify();
+    return newNote;
   }
 
   public updatePositiveNote(id: string, updated: Partial<PositiveNote>) {
-    if (!this.checkWriteAuthorization()) return;
+    if (this.currentUser.role !== 'gvcn') {
+      this.showToast('🔒 Chỉ Giáo viên Chủ nhiệm (GVCN) mới có quyền thay đổi nội dung lời khen!', 'error');
+      return;
+    }
     const index = this.positiveNotes.findIndex((n) => n.id === id);
     if (index >= 0) {
       this.positiveNotes[index] = { ...this.positiveNotes[index], ...updated };
       this.saveLocalState();
-      this.addAuditLog(this.currentUser.name, 'Chỉnh sửa lời khen tích cực', 'positive_note', id);
+      this.addAuditLog(this.currentUser.name || 'GVCN', 'Chỉnh sửa lời khen tích cực', 'positive_note', id);
       this.notify();
     }
   }
 
   public deletePositiveNote(id: string) {
-    if (!this.checkWriteAuthorization()) return;
+    if (this.currentUser.role !== 'gvcn') {
+      this.showToast('🔒 Chỉ Giáo viên Chủ nhiệm (GVCN) mới có quyền xóa lời khen!', 'error');
+      return;
+    }
     this.positiveNotes = this.positiveNotes.filter((n) => n.id !== id);
     this.saveLocalState();
-    this.addAuditLog(this.currentUser.name, 'Xóa lời khen tích cực', 'positive_note', id);
+    this.addAuditLog(this.currentUser.name || 'GVCN', 'Xóa lời khen tích cực', 'positive_note', id);
     this.notify();
   }
 
   // --- Rewards Edit & Delete ---
   public updateReward(id: string, updated: Partial<RewardRecord>) {
-    if (!this.checkWriteAuthorization()) return;
+    if (this.currentUser.role !== 'gvcn') {
+      this.showToast('🔒 Chỉ Giáo viên Chủ nhiệm (GVCN) mới có quyền thay đổi nội dung khen thưởng!', 'error');
+      return;
+    }
     const index = this.rewards.findIndex((r) => r.id === id);
     if (index >= 0) {
       this.rewards[index] = { ...this.rewards[index], ...updated };
       this.calculateAllWeeklyScores(0, true);
       this.saveLocalState();
-      this.addAuditLog(this.currentUser.name, 'Chỉnh sửa điểm khen thưởng', 'reward', id);
+      this.addAuditLog(this.currentUser.name || 'GVCN', 'Chỉnh sửa điểm khen thưởng', 'reward', id);
       this.notify();
     }
   }
 
   public deleteReward(id: string) {
-    if (!this.checkWriteAuthorization()) return;
+    if (this.currentUser.role !== 'gvcn') {
+      this.showToast('🔒 Chỉ Giáo viên Chủ nhiệm (GVCN) mới có quyền xóa ghi nhận khen thưởng!', 'error');
+      return;
+    }
     this.rewards = this.rewards.filter((r) => r.id !== id);
     this.calculateAllWeeklyScores(0, true);
     this.saveLocalState();
-    this.addAuditLog(this.currentUser.name, 'Xóa ghi nhận khen thưởng', 'reward', id);
+    this.addAuditLog(this.currentUser.name || 'GVCN', 'Xóa ghi nhận khen thưởng', 'reward', id);
     this.notify();
   }
 
   // --- Qualitative Comments CRUD ---
   public addQualitativeComment(comment: Omit<QualitativeComment, 'id' | 'created_at'>) {
-    if (!this.checkWriteAuthorization()) return;
     const id = `qc-${Date.now()}`;
     const newComment: QualitativeComment = { ...comment, id, created_at: new Date().toISOString() };
     this.qualitativeComments.unshift(newComment);
     this.saveLocalState();
-    this.addAuditLog(this.currentUser.name, 'Thêm nhận xét định tính', 'qualitative_comment', id);
+    this.addAuditLog(this.currentUser.name || 'Người dùng', 'Thêm nhận xét định tính', 'qualitative_comment', id);
     this.notify();
     return newComment;
   }
 
   public updateQualitativeComment(id: string, updated: Partial<QualitativeComment>) {
-    if (!this.checkWriteAuthorization()) return;
     const index = this.qualitativeComments.findIndex((c) => c.id === id);
     if (index >= 0) {
       this.qualitativeComments[index] = { ...this.qualitativeComments[index], ...updated };
       this.saveLocalState();
-      this.addAuditLog(this.currentUser.name, 'Chỉnh sửa nhận xét định tính', 'qualitative_comment', id);
+      this.addAuditLog(this.currentUser.name || 'Người dùng', 'Chỉnh sửa nhận xét định tính', 'qualitative_comment', id);
       this.notify();
     }
   }
 
   public deleteQualitativeComment(id: string) {
-    if (!this.checkWriteAuthorization()) return;
     this.qualitativeComments = this.qualitativeComments.filter((c) => c.id !== id);
     this.saveLocalState();
-    this.addAuditLog(this.currentUser.name, 'Xóa nhận xét định tính', 'qualitative_comment', id);
+    this.addAuditLog(this.currentUser.name || 'Người dùng', 'Xóa nhận xét định tính', 'qualitative_comment', id);
     this.notify();
   }
 
   // --- Support Plans CRUD ---
   public addSupportPlan(plan: Omit<SupportPlan, 'id' | 'created_at'>) {
-    if (!this.checkWriteAuthorization()) return;
     const id = `sp-${Date.now()}`;
     const newPlan: SupportPlan = { ...plan, id, created_at: new Date().toISOString() };
     this.supportPlans.unshift(newPlan);
     this.saveLocalState();
-    this.addAuditLog(this.currentUser.name, 'Thêm kế hoạch hỗ trợ sư phạm', 'support_plan', id);
+    this.addAuditLog(this.currentUser.name || 'Người dùng', 'Thêm kế hoạch hỗ trợ sư phạm', 'support_plan', id);
     this.notify();
     return newPlan;
   }
 
   public updateSupportPlan(id: string, updated: Partial<SupportPlan>) {
-    if (!this.checkWriteAuthorization()) return;
     const index = this.supportPlans.findIndex((p) => p.id === id);
     if (index >= 0) {
       this.supportPlans[index] = { ...this.supportPlans[index], ...updated };
       this.saveLocalState();
-      this.addAuditLog(this.currentUser.name, 'Chỉnh sửa kế hoạch hỗ trợ', 'support_plan', id);
+      this.addAuditLog(this.currentUser.name || 'Người dùng', 'Chỉnh sửa kế hoạch hỗ trợ', 'support_plan', id);
       this.notify();
     }
   }
 
   public deleteSupportPlan(id: string) {
-    if (!this.checkWriteAuthorization()) return;
     this.supportPlans = this.supportPlans.filter((p) => p.id !== id);
     this.saveLocalState();
-    this.addAuditLog(this.currentUser.name, 'Xóa kế hoạch hỗ trợ', 'support_plan', id);
+    this.addAuditLog(this.currentUser.name || 'Người dùng', 'Xóa kế hoạch hỗ trợ', 'support_plan', id);
     this.notify();
   }
 
