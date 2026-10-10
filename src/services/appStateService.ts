@@ -255,6 +255,7 @@ class AppStateService {
   public seats: Seat[] = [];
   public seatingPlans: SeatingPlan[] = [];
   public activeSeatingPlanId: string = 'plan-official';
+  public weeklyDutyOverrides: Record<number, string> = {};
   public dutyRoster: DutyRosterDay[] = [
     { dayOfWeek: 'thu2', dayLabel: 'Thứ 2', assignedGroupId: 'group-01', groupName: 'Tổ 1', status: 'pending', notes: 'Trực nhật sáng & phục vụ Chào cờ' },
     { dayOfWeek: 'thu3', dayLabel: 'Thứ 3', assignedGroupId: 'group-02', groupName: 'Tổ 2', status: 'pending', notes: 'Quét lớp, lau bảng & gom rác' },
@@ -737,6 +738,14 @@ class AppStateService {
           if (Array.isArray(parsed) && parsed.length > 0) this.dutyRoster = parsed;
         }
 
+        const savedDutyOverrides = localStorage.getItem('VTT_WEEKLY_DUTY_OVERRIDES');
+        if (savedDutyOverrides) {
+          try {
+            const parsed = JSON.parse(savedDutyOverrides);
+            if (parsed && typeof parsed === 'object') this.weeklyDutyOverrides = parsed;
+          } catch (e) {}
+        }
+
         const savedTasks = localStorage.getItem('VTT_TASKS');
         if (savedTasks) {
           const parsed = JSON.parse(savedTasks);
@@ -1045,6 +1054,7 @@ class AppStateService {
       localStorage.setItem('VTT_SEATING_PLANS', JSON.stringify(this.seatingPlans));
       localStorage.setItem('VTT_ACTIVE_SEATING_PLAN_ID', this.activeSeatingPlanId);
       localStorage.setItem('VTT_DUTY_ROSTER', JSON.stringify(this.dutyRoster));
+      localStorage.setItem('VTT_WEEKLY_DUTY_OVERRIDES', JSON.stringify(this.weeklyDutyOverrides));
       localStorage.setItem('VTT_TASKS', JSON.stringify(this.tasks));
       localStorage.setItem('VTT_POSITIVE_NOTES', JSON.stringify(this.positiveNotes));
       localStorage.setItem('VTT_PENDING_RULES', JSON.stringify(this.pendingRules));
@@ -2454,7 +2464,60 @@ class AppStateService {
     this.notify();
   }
 
-  // --- Duty Roster & Rotating Schedule ---
+  // --- Duty Roster & Weekly Rotating Schedule ---
+  public getWeeklyDutyGroup(weekNum: number): {
+    group: Group;
+    groupIndex: number;
+    leader?: Student;
+    members: Student[];
+    isOverridden: boolean;
+  } {
+    const w = Math.max(1, Math.min(36, weekNum));
+    const overriddenGroupId = this.weeklyDutyOverrides[w];
+    let isOverridden = false;
+    let targetGroup: Group | undefined;
+
+    if (overriddenGroupId) {
+      targetGroup = this.groups.find((g) => g.id === overriddenGroupId);
+      if (targetGroup) isOverridden = true;
+    }
+
+    if (!targetGroup) {
+      const groupIdx = (w - 1) % Math.max(1, this.groups.length);
+      targetGroup = this.groups[groupIdx] || this.groups[0];
+    }
+
+    const leader = this.students.find((s) => s.id === targetGroup?.leader_student_id);
+    const members = this.students.filter((s) => s.group_id === targetGroup?.id);
+    const groupIndex = this.groups.findIndex((g) => g.id === targetGroup?.id) + 1;
+
+    return {
+      group: targetGroup,
+      groupIndex: groupIndex > 0 ? groupIndex : 1,
+      leader,
+      members,
+      isOverridden,
+    };
+  }
+
+  public setWeeklyDutyGroup(weekNum: number, groupId: string) {
+    if (!this.checkWriteAuthorization()) return;
+    const w = Math.max(1, Math.min(36, weekNum));
+    this.weeklyDutyOverrides[w] = groupId;
+    this.saveLocalState();
+    const gName = this.groups.find((g) => g.id === groupId)?.group_name || groupId;
+    this.showToast(`Đã gán ${gName} trực nhật Tuần ${w}!`, 'success');
+    this.notify();
+  }
+
+  public resetWeeklyDutyRotation() {
+    if (!this.checkWriteAuthorization()) return;
+    this.weeklyDutyOverrides = {};
+    this.saveLocalState();
+    this.showToast('Đã khôi phục lịch trực nhật xoay vòng mặc định (Tuần 1 ➔ Tổ 1, Tuần 2 ➔ Tổ 2, Tuần 3 ➔ Tổ 3...)!', 'success');
+    this.notify();
+  }
+
   public updateDutyRosterDay(dayOfWeek: string, updates: Partial<DutyRosterDay>) {
     if (!this.checkWriteAuthorization()) return;
     const dayIndex = this.dutyRoster.findIndex((d) => d.dayOfWeek === dayOfWeek);
@@ -2561,10 +2624,17 @@ class AppStateService {
     }
     text += `\n`;
 
-    text += `🧹 4. LỊCH TRỰC NHẬT TUẦN TỚI:\n`;
-    this.dutyRoster.forEach((d) => {
-      text += `• ${d.dayLabel}: ${d.groupName}\n`;
-    });
+    const nextWeek = Math.min(36, weekNumber + 1);
+    const nextWeekRange = getWeekDateRange(nextWeek);
+    const nextDuty = this.getWeeklyDutyGroup(nextWeek);
+
+    text += `🧹 4. LỊCH TRỰC NHẬT TUẦN TỚI (TUẦN ${nextWeek}: ${nextWeekRange.shortRange}):\n`;
+    text += `• Tổ phụ trách trực nhật cả tuần: ${nextDuty.group?.group_name || 'Tổ ' + nextDuty.groupIndex}\n`;
+    if (nextDuty.leader) {
+      text += `• Tổ trưởng chịu trách nhiệm: ${nextDuty.leader.full_name}\n`;
+    }
+    text += `• Lịch trực: Từ Thứ 2 đến Thứ 7 (${nextWeekRange.shortRange})\n`;
+    text += `• Nội dung: Trực nhật vệ sinh lớp học, lau bảng, đổ rác và kê ngay ngắn bàn ghế sau giờ học.\n`;
     text += `\n`;
 
     text += `📝 5. DẶN DÒ CỦA GVCN:\n`;

@@ -1,8 +1,20 @@
 import React, { useState } from 'react';
 import { appState } from '../services/appStateService';
-import { Task, DutyRosterDay } from '../types';
+import { Task } from '../types';
 import { StatusBadge } from '../components/StatusBadge';
-import { CheckSquare, Plus, AlertCircle, ShieldAlert, X, Check, Brush, RefreshCw, Users, Sparkles, CheckCircle2 } from 'lucide-react';
+import {
+  CheckSquare,
+  Plus,
+  ShieldAlert,
+  X,
+  Brush,
+  RefreshCw,
+  Users,
+  Sparkles,
+  Calendar,
+  UserCheck,
+} from 'lucide-react';
+import { getWeekDateRange } from '../domain/scoring/scoringEngine';
 
 export const TasksPage: React.FC = () => {
   const tasks = appState.tasks;
@@ -12,6 +24,7 @@ export const TasksPage: React.FC = () => {
   const currentUser = appState.currentUser;
 
   const [activeTab, setActiveTab] = useState<'tasks' | 'duty'>('duty');
+  const [selectedDutyWeek, setSelectedDutyWeek] = useState<number>(1);
 
   const canManageTasks =
     Boolean(currentUser.isAuthenticatedOfficer) &&
@@ -24,6 +37,9 @@ export const TasksPage: React.FC = () => {
   const [description, setDescription] = useState('');
   const [dueDate, setDueDate] = useState(new Date().toISOString().split('T')[0]);
   const [assignedStudentId, setAssignedStudentId] = useState(students[0]?.id || '');
+
+  const selectedWeekRange = getWeekDateRange(selectedDutyWeek);
+  const selectedDutyInfo = appState.getWeeklyDutyGroup(selectedDutyWeek);
 
   const handleCreateTask = (e: React.FormEvent) => {
     e.preventDefault();
@@ -53,7 +69,7 @@ export const TasksPage: React.FC = () => {
         <div>
           <h2 className="text-lg font-black text-slate-900 tracking-tight">Phân Công Nhiệm Vụ & Lịch Trực Nhật</h2>
           <p className="text-xs text-slate-500">
-            Quản lý công việc lớp, lịch xoay vòng trực nhật Tổ 1 ➔ Tổ 4 (Thứ 2 đến Thứ 7)
+            Trực nhật xoay vòng theo TUẦN (Mỗi tuần 1 Tổ phụ trách từ Thứ 2 đến Thứ 7: Tuần 1 ➔ Tổ 1, Tuần 2 ➔ Tổ 2...)
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -67,7 +83,7 @@ export const TasksPage: React.FC = () => {
               }`}
             >
               <Brush className="w-4 h-4" />
-              🧹 Lịch Trực Nhật Tuần
+              🧹 Lịch Trực Nhật Theo Tuần
             </button>
             <button
               onClick={() => setActiveTab('tasks')}
@@ -94,112 +110,258 @@ export const TasksPage: React.FC = () => {
         </div>
       </div>
 
-      {/* TAB 1: DUTY ROSTER (LỊCH TRỰC NHẬT TUẦN) */}
+      {/* TAB 1: DUTY ROSTER (LỊCH TRỰC NHẬT XOAY VÒNG THEO TUẦN) */}
       {activeTab === 'duty' && (
-        <div className="space-y-4">
+        <div className="space-y-5">
           {/* Duty Control Bar */}
-          <div className="bg-slate-900 p-4 rounded-2xl border border-slate-800 text-white flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-md">
-            <div className="space-y-0.5">
-              <div className="text-xs font-extrabold text-blue-400 flex items-center gap-1.5">
+          <div className="bg-gradient-to-r from-slate-900 via-blue-950 to-indigo-950 p-5 rounded-2xl border border-slate-800 text-white flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-md">
+            <div className="space-y-1">
+              <div className="text-xs font-extrabold text-blue-400 flex items-center gap-1.5 uppercase tracking-wide">
                 <Sparkles className="w-4 h-4 text-blue-400" />
-                BẢNG PHÂN CÔNG TRỰC NHẬT XOAY VÒNG THEO TỔ (THỨ 2 ➔ THỨ 7)
+                LỊCH PHÂN CÔNG TRỰC NHẬT XOAY VÒNG THEO TUẦN (XOAY THEO TỔ)
               </div>
-              <p className="text-[11px] text-slate-300">
-                Phân công rõ Tổ trưởng kiểm tra vệ sinh, lau bảng, đóng cửa sổ và kê bàn ghế.
+              <p className="text-xs text-slate-300 leading-relaxed">
+                Quy tắc xoay vòng: Mỗi tuần do <strong>1 Tổ phụ trách trực nhật cả tuần</strong> (từ Thứ 2 đến Thứ 7).
+                Lần lượt: Tuần 1 ➔ Tổ 1 | Tuần 2 ➔ Tổ 2 | Tuần 3 ➔ Tổ 3 | Tuần 4 ➔ Tổ 4 | Tuần 5 ➔ Lặp lại Tổ 1...
               </p>
             </div>
             <button
-              onClick={() => appState.autoRotateDutyRoster()}
+              onClick={() => appState.resetWeeklyDutyRotation()}
               className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl flex items-center gap-2 shadow-sm transition active:scale-95 cursor-pointer shrink-0"
             >
               <RefreshCw className="w-4 h-4" />
-              Xoay Vòng Trực Nhật Tự Động (Tổ 1 ➔ 4)
+              Đặt Lại Xoay Vòng Mặc Định (Tổ 1 ➔ 4)
             </button>
           </div>
 
-          {/* Grid of 6 Days (Thứ 2 đến Thứ 7) */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {dutyRoster.map((d) => {
-              const currentGroup = groups.find((g) => g.id === d.assignedGroupId) || groups[0];
-              const leader = students.find((s) => s.id === currentGroup?.leader_student_id);
-
-              return (
-                <div
-                  key={d.dayOfWeek}
-                  className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col justify-between hover:border-blue-300 transition"
-                >
-                  {/* Day Card Header */}
-                  <div className="bg-slate-50 p-3.5 border-b border-slate-200 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="p-1.5 bg-blue-100 text-blue-800 font-black text-xs rounded-lg">
-                        {d.dayLabel}
-                      </span>
-                      <span className="font-extrabold text-slate-900 text-sm">{currentGroup?.group_name || d.groupName}</span>
-                    </div>
-                    <select
-                      value={d.assignedGroupId}
-                      onChange={(e) =>
-                        appState.updateDutyRosterDay(d.dayOfWeek, { assignedGroupId: e.target.value })
-                      }
-                      className="px-2 py-1 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-800 cursor-pointer"
-                    >
-                      {groups.map((g) => (
-                        <option key={g.id} value={g.id}>
-                          {g.group_name}
+          {/* Selected Week Detail Card */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-3">
+                <Calendar className="w-5 h-5 text-blue-700 shrink-0" />
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-500 uppercase">Xem phân công trực nhật theo tuần:</label>
+                  <select
+                    value={selectedDutyWeek}
+                    onChange={(e) => setSelectedDutyWeek(Number(e.target.value))}
+                    className="px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-xl font-black text-blue-900 text-sm cursor-pointer focus:ring-2 focus:ring-blue-500 mt-0.5"
+                  >
+                    {Array.from({ length: 18 }, (_, i) => i + 1).map((w) => {
+                      const r = getWeekDateRange(w);
+                      return (
+                        <option key={w} value={w}>
+                          {r.optionLabel}
                         </option>
-                      ))}
-                    </select>
+                      );
+                    })}
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-600 font-semibold bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-200">
+                  🗓️ {selectedWeekRange.fullRangeText}
+                </span>
+              </div>
+            </div>
+
+            {/* Active Week Duty Card Info */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Box 1: Assigned Group */}
+              <div className="bg-gradient-to-br from-blue-50 to-indigo-50/60 p-4 rounded-xl border border-blue-200 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold uppercase text-blue-700">Tổ Phụ Trách Tuần {selectedDutyWeek}</span>
+                  {selectedDutyInfo.isOverridden && (
+                    <span className="px-2 py-0.5 bg-amber-100 text-amber-800 text-[10px] font-extrabold rounded-full border border-amber-300">
+                      Tùy chỉnh thủ công
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xl font-black text-blue-950">
+                    {selectedDutyInfo.group?.group_name || `Tổ ${selectedDutyInfo.groupIndex}`}
+                  </h3>
+                  <select
+                    value={selectedDutyInfo.group?.id || ''}
+                    onChange={(e) => appState.setWeeklyDutyGroup(selectedDutyWeek, e.target.value)}
+                    className="px-2.5 py-1 bg-white border border-blue-300 rounded-lg text-xs font-bold text-blue-900 cursor-pointer shadow-2xs"
+                  >
+                    {groups.map((g) => (
+                      <option key={g.id} value={g.id}>
+                        {g.group_name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <p className="text-xs text-blue-800 leading-snug">
+                  Chịu trách nhiệm trực nhật toàn bộ từ <strong>Thứ 2 đến Thứ 7</strong> ({selectedWeekRange.shortRange}).
+                </p>
+              </div>
+
+              {/* Box 2: Leader */}
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-2">
+                <span className="text-[11px] font-bold uppercase text-slate-500">Tổ Trưởng Phụ Trách Trực Nhật</span>
+                <div className="flex items-center gap-2.5 pt-1">
+                  <div className="p-2 bg-blue-100 text-blue-800 rounded-lg font-bold">
+                    <UserCheck className="w-5 h-5" />
                   </div>
-
-                  {/* Duty Content & Responsibilities */}
-                  <div className="p-4 space-y-3 text-xs flex-1">
-                    <div className="flex items-center gap-2 p-2 bg-blue-50/60 rounded-xl border border-blue-100 text-blue-900">
-                      <Users className="w-4 h-4 text-blue-700 shrink-0" />
-                      <div>
-                        <span className="text-[10px] text-blue-600 block uppercase font-bold">Tổ trưởng chịu trách nhiệm:</span>
-                        <strong className="text-xs">{leader ? leader.full_name : 'Đang cập nhật'}</strong>
-                      </div>
-                    </div>
-
-                    <div className="space-y-1">
-                      <label className="font-bold text-slate-700 block text-[11px]">Nhiệm vụ cụ thể ngày {d.dayLabel}:</label>
-                      <input
-                        type="text"
-                        value={d.notes || ''}
-                        onChange={(e) =>
-                          appState.updateDutyRosterDay(d.dayOfWeek, { notes: e.target.value })
-                        }
-                        placeholder="VD: Quét lớp, lau bảng, gom rác..."
-                        className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs text-slate-900 focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
-
-                    {/* Duty Status Selector */}
-                    <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
-                      <span className="text-[11px] font-bold text-slate-500">Đánh giá thực hiện:</span>
-                      <select
-                        value={d.status || 'pending'}
-                        onChange={(e) =>
-                          appState.updateDutyRosterDay(d.dayOfWeek, { status: e.target.value as any })
-                        }
-                        className={`px-2.5 py-1 rounded-lg text-xs font-bold border cursor-pointer ${
-                          d.status === 'completed_good'
-                            ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
-                            : d.status === 'needs_improvement'
-                            ? 'bg-rose-50 text-rose-800 border-rose-300'
-                            : 'bg-slate-50 text-slate-700 border-slate-300'
-                        }`}
-                      >
-                        <option value="pending">Chưa thực hiện</option>
-                        <option value="completed_good">✅ Hoàn thành sạch đẹp</option>
-                        <option value="completed_ok">👍 Đạt yêu cầu</option>
-                        <option value="needs_improvement">⚠️ Cần nhắc nhở vệ sinh</option>
-                      </select>
-                    </div>
+                  <div>
+                    <h4 className="font-extrabold text-slate-900 text-sm">
+                      {selectedDutyInfo.leader ? selectedDutyInfo.leader.full_name : 'Đang cập nhật tổ trưởng'}
+                    </h4>
+                    <span className="text-xs text-slate-500">
+                      Mã HS: {selectedDutyInfo.leader?.student_code || '---'}
+                    </span>
                   </div>
                 </div>
-              );
-            })}
+              </div>
+
+              {/* Box 3: Group Roster Count */}
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-2">
+                <span className="text-[11px] font-bold uppercase text-slate-500">Phân Công Nhân Sự Sĩ Số</span>
+                <div className="flex items-center gap-2.5 pt-1">
+                  <div className="p-2 bg-emerald-100 text-emerald-800 rounded-lg font-bold">
+                    <Users className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h4 className="font-extrabold text-slate-900 text-sm">
+                      {selectedDutyInfo.members.length} Học Sinh
+                    </h4>
+                    <span className="text-xs text-emerald-700 font-semibold">
+                      Toàn bộ thành viên {selectedDutyInfo.group?.group_name} cùng trực
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* List of Students in Assigned Group */}
+            <div className="bg-slate-50/80 p-4 rounded-xl border border-slate-200 space-y-2">
+              <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                <Users className="w-4 h-4 text-blue-700" />
+                Danh sách học sinh {selectedDutyInfo.group?.group_name} phụ trách trực nhật Tuần {selectedDutyWeek}:
+              </label>
+              <div className="flex flex-wrap gap-1.5">
+                {selectedDutyInfo.members.map((stu) => (
+                  <span
+                    key={stu.id}
+                    className={`px-2.5 py-1 text-xs font-bold rounded-lg border ${
+                      stu.id === selectedDutyInfo.leader?.id
+                        ? 'bg-blue-600 text-white border-blue-700 shadow-2xs'
+                        : 'bg-white text-slate-800 border-slate-300'
+                    }`}
+                  >
+                    {stu.full_name} {stu.id === selectedDutyInfo.leader?.id && '👑 (Tổ trưởng)'}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            {/* Daily Routine checklist for the week */}
+            <div className="space-y-2 pt-2">
+              <label className="text-xs font-extrabold text-slate-900 uppercase tracking-tight block">
+                📋 Nội dung công việc trực nhật theo ngày trong Tuần {selectedDutyWeek} ({selectedDutyInfo.group?.group_name}):
+              </label>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {dutyRoster.map((d) => (
+                  <div key={d.dayOfWeek} className="p-3 bg-white rounded-xl border border-slate-200 text-xs space-y-1.5">
+                    <div className="flex items-center justify-between font-bold text-slate-900">
+                      <span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded-md font-black">
+                        {d.dayLabel}
+                      </span>
+                      <span className="text-slate-600 text-[11px] font-semibold">{selectedDutyInfo.group?.group_name}</span>
+                    </div>
+                    <input
+                      type="text"
+                      value={d.notes || ''}
+                      onChange={(e) => appState.updateDutyRosterDay(d.dayOfWeek, { notes: e.target.value })}
+                      placeholder="Nhiệm vụ: lau bảng, quét dọn, kê ghế..."
+                      className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Full Semester Weekly Duty Rotation Table */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+              <div>
+                <h3 className="font-extrabold text-base text-slate-900">
+                  🗓️ Bảng Phân Công Trực Nhật Xoay Vòng Tất Cả Các Tuần (Học Kỳ 1)
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Lịch trực nhật xoay vòng liên tục theo tuần (Tổ 1 ➔ Tổ 2 ➔ Tổ 3 ➔ Tổ 4 ➔ Tổ 1...)
+                </p>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto text-xs">
+              <table className="w-full text-left border-collapse border border-slate-200">
+                <thead>
+                  <tr className="bg-slate-100 text-slate-800 font-bold border-b border-slate-200">
+                    <th className="p-2.5 border border-slate-200 text-center">Tuần</th>
+                    <th className="p-2.5 border border-slate-200">Thời gian (Từ ngày ➔ Đến ngày)</th>
+                    <th className="p-2.5 border border-slate-200 text-center">Tổ Phụ Trách Trực Nhật</th>
+                    <th className="p-2.5 border border-slate-200">Tổ Trưởng Chịu Trách Nhiệm</th>
+                    <th className="p-2.5 border border-slate-200 text-center">Sĩ Số Tổ</th>
+                    <th className="p-2.5 border border-slate-200 text-center">Tùy Chỉnh Phân Công</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {Array.from({ length: 18 }, (_, i) => i + 1).map((w) => {
+                    const r = getWeekDateRange(w);
+                    const duty = appState.getWeeklyDutyGroup(w);
+                    const isSelected = selectedDutyWeek === w;
+
+                    return (
+                      <tr
+                        key={w}
+                        onClick={() => setSelectedDutyWeek(w)}
+                        className={`border-b border-slate-200 cursor-pointer transition ${
+                          isSelected ? 'bg-blue-50/90 font-semibold' : 'hover:bg-slate-50'
+                        }`}
+                      >
+                        <td className="p-2.5 border border-slate-200 text-center font-black text-blue-900">
+                          Tuần {w} {isSelected && '👈'}
+                        </td>
+                        <td className="p-2.5 border border-slate-200 font-mono text-slate-700">
+                          {r.fullRangeText}
+                        </td>
+                        <td className="p-2.5 border border-slate-200 text-center">
+                          <span className="px-3 py-1 bg-blue-600 text-white font-extrabold rounded-lg text-xs shadow-2xs">
+                            {duty.group?.group_name || `Tổ ${duty.groupIndex}`}
+                          </span>
+                        </td>
+                        <td className="p-2.5 border border-slate-200 font-medium text-slate-900">
+                          {duty.leader ? duty.leader.full_name : '---'}
+                        </td>
+                        <td className="p-2.5 border border-slate-200 text-center font-mono">
+                          {duty.members.length} HS
+                        </td>
+                        <td
+                          className="p-2.5 border border-slate-200 text-center"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <select
+                            value={duty.group?.id || ''}
+                            onChange={(e) => appState.setWeeklyDutyGroup(w, e.target.value)}
+                            className="px-2 py-1 bg-white border border-slate-300 rounded-md text-xs font-bold text-slate-800 cursor-pointer"
+                          >
+                            {groups.map((g) => (
+                              <option key={g.id} value={g.id}>
+                                {g.group_name}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}
