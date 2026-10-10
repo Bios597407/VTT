@@ -68,8 +68,10 @@ export const QualitativePage: React.FC = () => {
     if (activeTab === 'group') authorName = `Tổ trưởng / Tổ đánh giá`;
     if (activeTab === 'parent') authorName = 'Phụ huynh học sinh';
 
+    const targetStudentId = selectedStudentId || students[0]?.id || 'stu-01';
+
     appState.addQualitativeComment({
-      studentId: selectedStudentId,
+      studentId: targetStudentId,
       author: authorName,
       authorRole: currentUser.role,
       category: activeTab === 'support' ? 'teacher' : activeTab,
@@ -83,7 +85,7 @@ export const QualitativePage: React.FC = () => {
 
   const handleOpenEditComment = (comment: QualitativeComment) => {
     setEditingComment(comment);
-    setEditCommentStudentId(comment.studentId);
+    setEditCommentStudentId(comment.studentId || students[0]?.id || '');
     setEditCommentContent(comment.content);
     setEditCommentDate(comment.date || new Date().toISOString().split('T')[0]);
   };
@@ -93,7 +95,7 @@ export const QualitativePage: React.FC = () => {
     if (!editingComment || !editCommentContent.trim()) return;
 
     appState.updateQualitativeComment(editingComment.id, {
-      studentId: editCommentStudentId,
+      studentId: editCommentStudentId || editingComment.studentId || students[0]?.id || '',
       content: editCommentContent.trim(),
       date: editCommentDate,
     });
@@ -112,8 +114,10 @@ export const QualitativePage: React.FC = () => {
     e.preventDefault();
     if (!planObjective.trim() || !planDescription.trim()) return;
 
+    const targetStudentId = planStudentId || students[0]?.id || 'stu-01';
+
     appState.addSupportPlan({
-      studentId: planStudentId,
+      studentId: targetStudentId,
       objective: planObjective.trim(),
       plan: planDescription.trim(),
       status: planStatus,
@@ -129,7 +133,7 @@ export const QualitativePage: React.FC = () => {
 
   const handleOpenEditPlan = (plan: SupportPlan) => {
     setEditingPlan(plan);
-    setEditPlanStudentId(plan.studentId);
+    setEditPlanStudentId(plan.studentId || students[0]?.id || '');
     setEditPlanObjective(plan.objective);
     setEditPlanDescription(plan.plan);
     setEditPlanStatus(plan.status);
@@ -140,7 +144,7 @@ export const QualitativePage: React.FC = () => {
     if (!editingPlan || !editPlanObjective.trim() || !editPlanDescription.trim()) return;
 
     appState.updateSupportPlan(editingPlan.id, {
-      studentId: editPlanStudentId,
+      studentId: editPlanStudentId || editingPlan.studentId || students[0]?.id || '',
       objective: editPlanObjective.trim(),
       plan: editPlanDescription.trim(),
       status: editPlanStatus,

@@ -52,8 +52,10 @@ export const RewardsPage: React.FC = () => {
     const catalogItem = OFFICIAL_REWARD_CATALOG.find((c) => c.code === rewardCode);
     const points = catalogItem?.points ?? 1;
 
+    const targetStudentId = studentId || students[0]?.id || 'stu-01';
+
     const result = appState.submitReward({
-      student_id: studentId,
+      student_id: targetStudentId,
       class_id: 'class-10a16',
       reward_code: rewardCode,
       title: title.trim(),
@@ -77,7 +79,7 @@ export const RewardsPage: React.FC = () => {
 
   const handleOpenEditReward = (reward: RewardRecord) => {
     setEditingReward(reward);
-    setEditRewardStudentId(reward.student_id);
+    setEditRewardStudentId(reward.student_id || students[0]?.id || '');
     setEditRewardCode(reward.reward_code);
     setEditRewardTitle(reward.title);
     setEditRewardDate(reward.date);
@@ -91,7 +93,7 @@ export const RewardsPage: React.FC = () => {
     const points = catalogItem?.points ?? 1;
 
     appState.updateReward(editingReward.id, {
-      student_id: editRewardStudentId,
+      student_id: editRewardStudentId || editingReward.student_id || students[0]?.id || '',
       reward_code: editRewardCode,
       title: editRewardTitle.trim(),
       points,
@@ -112,8 +114,10 @@ export const RewardsPage: React.FC = () => {
     e.preventDefault();
     if (!noteContent.trim()) return;
 
+    const targetStudentId = noteStudentId || students[0]?.id || 'stu-01';
+
     appState.addPositiveNote({
-      student_id: noteStudentId,
+      student_id: targetStudentId,
       class_id: 'class-10a16',
       teacher_name: currentUser.name,
       note_content: noteContent.trim(),
@@ -128,7 +132,7 @@ export const RewardsPage: React.FC = () => {
 
   const handleOpenEditNote = (note: PositiveNote) => {
     setEditingNote(note);
-    setEditNoteStudentId(note.student_id);
+    setEditNoteStudentId(note.student_id || students[0]?.id || '');
     setEditNoteContent(note.note_content);
     setEditNoteCategory(note.category);
   };
@@ -138,7 +142,7 @@ export const RewardsPage: React.FC = () => {
     if (!editingNote || !editNoteContent.trim()) return;
 
     appState.updatePositiveNote(editingNote.id, {
-      student_id: editNoteStudentId,
+      student_id: editNoteStudentId || editingNote.student_id || students[0]?.id || '',
       note_content: editNoteContent.trim(),
       category: editNoteCategory,
     });

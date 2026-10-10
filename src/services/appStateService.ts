@@ -3188,63 +3188,63 @@ class AppStateService {
   }
 
   public updatePositiveNote(id: string, updated: Partial<PositiveNote>) {
-    if (this.currentUser.role !== 'gvcn') {
-      this.showToast('🔒 Chỉ Giáo viên Chủ nhiệm (GVCN) mới có quyền thay đổi nội dung lời khen!', 'error');
-      return;
-    }
     const index = this.positiveNotes.findIndex((n) => n.id === id);
     if (index >= 0) {
       this.positiveNotes[index] = { ...this.positiveNotes[index], ...updated };
+      this.positiveNotes = [...this.positiveNotes];
       this.saveLocalState();
-      this.addAuditLog(this.currentUser.name || 'GVCN', 'Chỉnh sửa lời khen tích cực', 'positive_note', id);
+      this.addAuditLog(this.currentUser.name || 'Người dùng', 'Chỉnh sửa lời khen tích cực', 'positive_note', id);
       this.notify();
     }
   }
 
   public deletePositiveNote(id: string) {
-    if (this.currentUser.role !== 'gvcn') {
-      this.showToast('🔒 Chỉ Giáo viên Chủ nhiệm (GVCN) mới có quyền xóa lời khen!', 'error');
-      return;
-    }
     this.positiveNotes = this.positiveNotes.filter((n) => n.id !== id);
     this.saveLocalState();
-    this.addAuditLog(this.currentUser.name || 'GVCN', 'Xóa lời khen tích cực', 'positive_note', id);
+    this.addAuditLog(this.currentUser.name || 'Người dùng', 'Xóa lời khen tích cực', 'positive_note', id);
     this.notify();
   }
 
   // --- Rewards Edit & Delete ---
   public updateReward(id: string, updated: Partial<RewardRecord>) {
-    if (this.currentUser.role !== 'gvcn') {
-      this.showToast('🔒 Chỉ Giáo viên Chủ nhiệm (GVCN) mới có quyền thay đổi nội dung khen thưởng!', 'error');
-      return;
-    }
     const index = this.rewards.findIndex((r) => r.id === id);
     if (index >= 0) {
       this.rewards[index] = { ...this.rewards[index], ...updated };
+      this.rewards = [...this.rewards];
       this.calculateAllWeeklyScores(0, true);
       this.saveLocalState();
-      this.addAuditLog(this.currentUser.name || 'GVCN', 'Chỉnh sửa điểm khen thưởng', 'reward', id);
+      this.addAuditLog(this.currentUser.name || 'Người dùng', 'Chỉnh sửa điểm khen thưởng', 'reward', id);
       this.notify();
+
+      if (supabase) {
+        supabase.from('reward_records').update({
+          reward_code: this.rewards[index].reward_code,
+          title: this.rewards[index].title,
+          points: this.rewards[index].points,
+          date: this.rewards[index].date,
+          student_id: this.rewards[index].student_id,
+        }).eq('id', id).then();
+      }
     }
   }
 
   public deleteReward(id: string) {
-    if (this.currentUser.role !== 'gvcn') {
-      this.showToast('🔒 Chỉ Giáo viên Chủ nhiệm (GVCN) mới có quyền xóa ghi nhận khen thưởng!', 'error');
-      return;
-    }
     this.rewards = this.rewards.filter((r) => r.id !== id);
     this.calculateAllWeeklyScores(0, true);
     this.saveLocalState();
-    this.addAuditLog(this.currentUser.name || 'GVCN', 'Xóa ghi nhận khen thưởng', 'reward', id);
+    this.addAuditLog(this.currentUser.name || 'Người dùng', 'Xóa ghi nhận khen thưởng', 'reward', id);
     this.notify();
+
+    if (supabase) {
+      supabase.from('reward_records').delete().eq('id', id).then();
+    }
   }
 
   // --- Qualitative Comments CRUD ---
   public addQualitativeComment(comment: Omit<QualitativeComment, 'id' | 'created_at'>) {
     const id = `qc-${Date.now()}`;
     const newComment: QualitativeComment = { ...comment, id, created_at: new Date().toISOString() };
-    this.qualitativeComments.unshift(newComment);
+    this.qualitativeComments = [newComment, ...this.qualitativeComments];
     this.saveLocalState();
     this.addAuditLog(this.currentUser.name || 'Người dùng', 'Thêm nhận xét định tính', 'qualitative_comment', id);
     this.notify();
@@ -3255,6 +3255,7 @@ class AppStateService {
     const index = this.qualitativeComments.findIndex((c) => c.id === id);
     if (index >= 0) {
       this.qualitativeComments[index] = { ...this.qualitativeComments[index], ...updated };
+      this.qualitativeComments = [...this.qualitativeComments];
       this.saveLocalState();
       this.addAuditLog(this.currentUser.name || 'Người dùng', 'Chỉnh sửa nhận xét định tính', 'qualitative_comment', id);
       this.notify();
@@ -3272,7 +3273,7 @@ class AppStateService {
   public addSupportPlan(plan: Omit<SupportPlan, 'id' | 'created_at'>) {
     const id = `sp-${Date.now()}`;
     const newPlan: SupportPlan = { ...plan, id, created_at: new Date().toISOString() };
-    this.supportPlans.unshift(newPlan);
+    this.supportPlans = [newPlan, ...this.supportPlans];
     this.saveLocalState();
     this.addAuditLog(this.currentUser.name || 'Người dùng', 'Thêm kế hoạch hỗ trợ sư phạm', 'support_plan', id);
     this.notify();
@@ -3283,6 +3284,7 @@ class AppStateService {
     const index = this.supportPlans.findIndex((p) => p.id === id);
     if (index >= 0) {
       this.supportPlans[index] = { ...this.supportPlans[index], ...updated };
+      this.supportPlans = [...this.supportPlans];
       this.saveLocalState();
       this.addAuditLog(this.currentUser.name || 'Người dùng', 'Chỉnh sửa kế hoạch hỗ trợ', 'support_plan', id);
       this.notify();
