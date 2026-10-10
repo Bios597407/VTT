@@ -920,6 +920,9 @@ class AppStateService {
       }
     }
 
+    // Tính toán lại toàn bộ điểm số tuần dựa trên dữ liệu đã nạp từ LocalStorage
+    this.calculateAllWeeklyScores(0, false);
+
     // MẶC ĐỊNH: GVCN Toàn quyền điều hành & quản lý toàn bộ hệ thống không hạn chế
     if (typeof window !== 'undefined') {
       try {
@@ -3099,6 +3102,10 @@ class AppStateService {
 
   // --- Rewards ---
   public submitReward(reward: Omit<RewardRecord, 'id' | 'created_at'>): { success: boolean; id: string; warning?: string } {
+    if (this.currentUser.role !== 'gvcn') {
+      this.showToast('🔒 Chỉ Giáo viên Chủ nhiệm (GVCN) mới có quyền thực hiện khen thưởng!', 'error');
+      return { success: false, id: '' };
+    }
     const isDup = this.rewards.some(
       (r) => r.student_id === reward.student_id && r.reward_code === reward.reward_code && r.date === reward.date
     );
@@ -3113,7 +3120,7 @@ class AppStateService {
 
     this.rewards.unshift(newRew);
     this.saveLocalState();
-    this.addAuditLog(this.currentUser.name || 'Người dùng', 'Đề xuất khen thưởng nề nếp', 'reward', id, `Mã: ${reward.reward_code} (+${reward.points}đ)`);
+    this.addAuditLog(this.currentUser.name || 'GVCN', 'Ghi nhận khen thưởng nề nếp', 'reward', id, `Mã: ${reward.reward_code} (+${reward.points}đ)`);
     this.calculateAllWeeklyScores(0);
     this.notify();
 
@@ -3167,11 +3174,15 @@ class AppStateService {
 
   // --- Positive Notes ---
   public addPositiveNote(note: Omit<PositiveNote, 'id' | 'created_at'>) {
+    if (this.currentUser.role !== 'gvcn') {
+      this.showToast('🔒 Chỉ Giáo viên Chủ nhiệm (GVCN) mới có quyền gửi lời khen tích cực!', 'error');
+      return;
+    }
     const id = `pos-${Date.now()}`;
     const newNote: PositiveNote = { ...note, id, created_at: new Date().toISOString() };
     this.positiveNotes.unshift(newNote);
     this.saveLocalState();
-    this.addAuditLog(this.currentUser.name || 'Người dùng', 'Ghi nhận lời khen tích cực', 'positive_note', id);
+    this.addAuditLog(this.currentUser.name || 'GVCN', 'Ghi nhận lời khen tích cực', 'positive_note', id);
     this.notify();
     return newNote;
   }
@@ -3869,7 +3880,7 @@ class AppStateService {
         .order('created_at', { ascending: false });
 
       if (!incErr && incData) {
-        this.incidents = incData.map((i: any) => ({
+        const fetchedInc = incData.map((i: any) => ({
           id: i.id,
           canonical_id: i.canonical_id || undefined,
           student_id: i.student_id,
@@ -3892,6 +3903,9 @@ class AppStateService {
           gvcn_comment: i.gvcn_comment || undefined,
           created_at: i.created_at || new Date().toISOString(),
         }));
+        const cloudIncIds = new Set(fetchedInc.map((i) => i.id));
+        const localOnlyInc = this.incidents.filter((i) => !cloudIncIds.has(i.id));
+        this.incidents = [...fetchedInc, ...localOnlyInc];
       }
 
       // 3. Fetch Rewards
@@ -3902,7 +3916,7 @@ class AppStateService {
         .order('created_at', { ascending: false });
 
       if (!rwErr && rwData) {
-        this.rewards = rwData.map((r: any) => ({
+        const fetchedRw = rwData.map((r: any) => ({
           id: r.id,
           student_id: r.student_id,
           class_id: r.class_id,
@@ -3914,6 +3928,9 @@ class AppStateService {
           date: r.date,
           created_at: r.created_at || new Date().toISOString(),
         }));
+        const cloudRwIds = new Set(fetchedRw.map((r) => r.id));
+        const localOnlyRw = this.rewards.filter((r) => !cloudRwIds.has(r.id));
+        this.rewards = [...fetchedRw, ...localOnlyRw];
       }
 
       // 4. Fetch Attendance
@@ -3924,7 +3941,7 @@ class AppStateService {
         .order('date', { ascending: false });
 
       if (!attErr && attData) {
-        this.attendance = attData.map((a: any) => ({
+        const fetchedAtt = attData.map((a: any) => ({
           id: a.id,
           student_id: a.student_id,
           class_id: a.class_id,
@@ -3935,6 +3952,9 @@ class AppStateService {
           reason: a.reason || undefined,
           is_legitimate_exception: Boolean(a.is_legitimate_exception),
         }));
+        const cloudAttIds = new Set(fetchedAtt.map((a) => a.id));
+        const localOnlyAtt = this.attendance.filter((a) => !cloudAttIds.has(a.id));
+        this.attendance = [...fetchedAtt, ...localOnlyAtt];
       }
 
       // 5. Fetch Seats directly from Supabase 'seats' table

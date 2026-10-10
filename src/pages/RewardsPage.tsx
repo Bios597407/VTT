@@ -16,9 +16,6 @@ export const RewardsPage: React.FC = () => {
   const students = appState.students;
   const currentUser = appState.currentUser;
 
-  // CHỈ CÓ GVCN MỚI CÓ QUYỀN THAY ĐỔI / CHỈNH SỬA / XÓA NỘI DUNG
-  const isGvcn = currentUser.role === 'gvcn';
-
   const [activeTab, setActiveTab] = useState<'rewards' | 'positive_notes'>('rewards');
 
   // New reward form state
@@ -51,6 +48,7 @@ export const RewardsPage: React.FC = () => {
   // --- Handlers for Rewards ---
   const handleCreateReward = (e: React.FormEvent) => {
     e.preventDefault();
+
     const catalogItem = OFFICIAL_REWARD_CATALOG.find((c) => c.code === rewardCode);
     const points = catalogItem?.points ?? 1;
 
@@ -60,9 +58,9 @@ export const RewardsPage: React.FC = () => {
       reward_code: rewardCode,
       title: title.trim(),
       points,
-      status: isGvcn ? 'approved' : 'pending',
+      status: 'approved',
       proposer: currentUser.name,
-      approver: isGvcn ? currentUser.name : undefined,
+      approver: currentUser.name,
       evidence_url: evidenceUrl || undefined,
       date,
     });
@@ -70,12 +68,7 @@ export const RewardsPage: React.FC = () => {
     if (result.warning) {
       appState.showToast(result.warning, 'warn');
     } else {
-      appState.showToast(
-        isGvcn
-          ? `Đã ghi nhận khen thưởng cho học sinh thành công!`
-          : `Đã gửi đề xuất khen thưởng (chờ GVCN phê duyệt)!`,
-        'success'
-      );
+      appState.showToast(`Đã ghi nhận khen thưởng cho học sinh thành công!`, 'success');
     }
 
     setShowRewardModal(false);
@@ -83,10 +76,6 @@ export const RewardsPage: React.FC = () => {
   };
 
   const handleOpenEditReward = (reward: RewardRecord) => {
-    if (!isGvcn) {
-      appState.showToast('🔒 Chỉ Giáo viên Chủ nhiệm (GVCN) mới có quyền chỉnh sửa/thay đổi nội dung khen thưởng!', 'error');
-      return;
-    }
     setEditingReward(reward);
     setEditRewardStudentId(reward.student_id);
     setEditRewardCode(reward.reward_code);
@@ -96,10 +85,6 @@ export const RewardsPage: React.FC = () => {
 
   const handleSaveEditReward = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isGvcn) {
-      appState.showToast('🔒 Chỉ Giáo viên Chủ nhiệm (GVCN) mới có quyền thay đổi nội dung khen thưởng!', 'error');
-      return;
-    }
     if (!editingReward || !editRewardTitle.trim()) return;
 
     const catalogItem = OFFICIAL_REWARD_CATALOG.find((c) => c.code === editRewardCode);
@@ -118,10 +103,6 @@ export const RewardsPage: React.FC = () => {
   };
 
   const handleDeleteReward = (id: string) => {
-    if (!isGvcn) {
-      appState.showToast('🔒 Chỉ Giáo viên Chủ nhiệm (GVCN) mới có quyền xóa ghi nhận khen thưởng!', 'error');
-      return;
-    }
     appState.deleteReward(id);
     appState.showToast('Đã xóa khen thưởng thành công!', 'info');
   };
@@ -146,10 +127,6 @@ export const RewardsPage: React.FC = () => {
   };
 
   const handleOpenEditNote = (note: PositiveNote) => {
-    if (!isGvcn) {
-      appState.showToast('🔒 Chỉ Giáo viên Chủ nhiệm (GVCN) mới có quyền chỉnh sửa/thay đổi nội dung lời khen!', 'error');
-      return;
-    }
     setEditingNote(note);
     setEditNoteStudentId(note.student_id);
     setEditNoteContent(note.note_content);
@@ -158,10 +135,6 @@ export const RewardsPage: React.FC = () => {
 
   const handleSaveEditNote = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isGvcn) {
-      appState.showToast('🔒 Chỉ Giáo viên Chủ nhiệm (GVCN) mới có quyền thay đổi nội dung lời khen!', 'error');
-      return;
-    }
     if (!editingNote || !editNoteContent.trim()) return;
 
     appState.updatePositiveNote(editingNote.id, {
@@ -175,10 +148,6 @@ export const RewardsPage: React.FC = () => {
   };
 
   const handleDeleteNote = (id: string) => {
-    if (!isGvcn) {
-      appState.showToast('🔒 Chỉ Giáo viên Chủ nhiệm (GVCN) mới có quyền xóa lời khen!', 'error');
-      return;
-    }
     appState.deletePositiveNote(id);
     appState.showToast('Đã xóa lời khen thành công!', 'info');
   };
@@ -201,7 +170,7 @@ export const RewardsPage: React.FC = () => {
             className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-sm transition active:scale-95 cursor-pointer"
           >
             <Award className="w-4 h-4" />
-            Đề xuất khen thưởng
+            Ghi nhận khen thưởng
           </button>
           <button
             onClick={() => setShowNoteModal(true)}
@@ -212,48 +181,6 @@ export const RewardsPage: React.FC = () => {
           </button>
         </div>
       </div>
-
-      {/* Role Notice Banner */}
-      {!isGvcn ? (
-        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-amber-900 shadow-xs">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-amber-100 rounded-xl text-amber-700 shrink-0">
-              <ShieldAlert className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="font-extrabold text-amber-950 text-sm">
-                Phân quyền bảo mật: Chỉ GVCN mới có quyền thay đổi nội dung
-              </div>
-              <p className="text-slate-600 mt-0.5">
-                Bạn hiện đang thao tác với vai trò <span className="font-bold text-slate-900">{currentUser.name}</span>. Các vai trò khác chỉ có quyền gửi đề xuất khen thưởng. Để chỉnh sửa, thay đổi hoặc xóa nội dung, vui lòng chuyển sang vai trò GVCN.
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => {
-              appState.setLoggedInRole('gvcn');
-              appState.showToast('🔑 Đã kích hoạt quyền Giáo viên Chủ nhiệm (GVCN)!', 'success');
-            }}
-            className="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-xl shrink-0 transition active:scale-95 shadow-xs flex items-center justify-center gap-1.5 cursor-pointer text-xs"
-          >
-            <ShieldCheck className="w-4 h-4" />
-            <span>Kích hoạt quyền GVCN</span>
-          </button>
-        </div>
-      ) : (
-        <div className="bg-emerald-50 border border-emerald-200 rounded-2xl px-4 py-2.5 flex items-center justify-between text-xs text-emerald-900 shadow-xs">
-          <div className="flex items-center gap-2">
-            <ShieldCheck className="w-4.5 h-4.5 text-emerald-600 shrink-0" />
-            <span>
-              Quyền hạn hiện tại: <strong className="font-black text-emerald-950">{currentUser.name}</strong> — <strong>Được toàn quyền thay đổi nội dung, chỉnh sửa, xóa và duyệt khen thưởng.</strong>
-            </span>
-          </div>
-          <span className="bg-emerald-200 text-emerald-900 font-extrabold px-2.5 py-0.5 rounded-full text-[10px] shrink-0">
-            Toàn quyền GVCN
-          </span>
-        </div>
-      )}
 
       {/* Tabs */}
       <div className="flex items-center gap-2 border-b border-slate-200 pb-2 text-xs font-bold">
@@ -311,26 +238,22 @@ export const RewardsPage: React.FC = () => {
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="font-black font-mono text-emerald-600 text-xs">+{r.points}đ</span>
-                        {isGvcn ? (
-                          <div className="flex items-center gap-1">
-                            <button
-                              onClick={() => handleOpenEditReward(r)}
-                              className="p-1 text-slate-500 hover:text-blue-600 rounded"
-                              title="GVCN chỉnh sửa nội dung"
-                            >
-                              <Edit3 className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              onClick={() => handleDeleteReward(r.id)}
-                              className="p-1 text-slate-500 hover:text-rose-600 rounded"
-                              title="GVCN xóa ghi nhận"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        ) : (
-                          <span className="text-[10px] text-slate-400 font-mono italic">Chỉ GVCN sửa</span>
-                        )}
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => handleOpenEditReward(r)}
+                            className="p-1 text-slate-500 hover:text-blue-600 rounded"
+                            title="Chỉnh sửa nội dung"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteReward(r.id)}
+                            className="p-1 text-slate-500 hover:text-rose-600 rounded"
+                            title="Xóa ghi nhận"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </div>
                     </div>
 
@@ -343,7 +266,7 @@ export const RewardsPage: React.FC = () => {
 
                     <div className="flex items-center justify-between pt-1 border-t border-slate-100 text-xs">
                       <StatusBadge type={r.status === 'approved' ? 'Đã duyệt' : 'Chờ xác minh'} />
-                      {isGvcn && r.status === 'pending' && (
+                      {r.status === 'pending' && (
                         <div className="flex items-center gap-1.5">
                           <button
                             onClick={() => {
@@ -385,7 +308,7 @@ export const RewardsPage: React.FC = () => {
                     <th className="py-3 px-4">Điểm cộng</th>
                     <th className="py-3 px-4">Người đề xuất</th>
                     <th className="py-3 px-4">Trạng thái</th>
-                    <th className="py-3 px-4 text-right">Thao tác {isGvcn ? '& Duyệt (GVCN)' : ''}</th>
+                    <th className="py-3 px-4 text-right">Thao tác</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -423,7 +346,7 @@ export const RewardsPage: React.FC = () => {
                           </td>
                           <td className="py-3 px-4 text-right">
                             <div className="flex items-center justify-end gap-1.5">
-                              {isGvcn && r.status === 'pending' && (
+                              {r.status === 'pending' && (
                                 <>
                                   <button
                                     onClick={() => appState.reviewReward(r.id, true)}
@@ -442,26 +365,20 @@ export const RewardsPage: React.FC = () => {
                                 </>
                               )}
 
-                              {isGvcn ? (
-                                <>
-                                  <button
-                                    onClick={() => handleOpenEditReward(r)}
-                                    className="p-1.5 bg-slate-100 hover:bg-blue-50 text-slate-600 hover:text-blue-600 rounded-lg transition"
-                                    title="GVCN chỉnh sửa nội dung"
-                                  >
-                                    <Edit3 className="w-3.5 h-3.5" />
-                                  </button>
-                                  <button
-                                    onClick={() => handleDeleteReward(r.id)}
-                                    className="p-1.5 bg-slate-100 hover:bg-rose-50 text-slate-600 hover:text-rose-600 rounded-lg transition"
-                                    title="GVCN xóa ghi nhận"
-                                  >
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                  </button>
-                                </>
-                              ) : (
-                                <span className="text-[11px] text-slate-400 italic">Chỉ GVCN sửa</span>
-                              )}
+                              <button
+                                onClick={() => handleOpenEditReward(r)}
+                                className="p-1.5 bg-slate-100 hover:bg-blue-50 text-slate-600 hover:text-blue-600 rounded-lg transition"
+                                title="Chỉnh sửa nội dung"
+                              >
+                                <Edit3 className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteReward(r.id)}
+                                className="p-1.5 bg-slate-100 hover:bg-rose-50 text-slate-600 hover:text-rose-600 rounded-lg transition"
+                                title="Xóa ghi nhận"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
                             </div>
                           </td>
                         </tr>
@@ -500,26 +417,22 @@ export const RewardsPage: React.FC = () => {
 
                     <div className="flex items-center gap-2">
                       <span className="text-[10px] text-slate-400 font-mono">{note.date}</span>
-                      {isGvcn ? (
-                        <div className="flex items-center gap-1">
-                          <button
-                            onClick={() => handleOpenEditNote(note)}
-                            className="p-1 text-slate-500 hover:text-blue-600 hover:bg-slate-100 rounded-lg transition"
-                            title="GVCN sửa lời khen"
-                          >
-                            <Edit3 className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteNote(note.id)}
-                            className="p-1 text-slate-500 hover:text-rose-600 hover:bg-slate-100 rounded-lg transition"
-                            title="GVCN xóa lời khen"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      ) : (
-                        <span className="text-[10px] text-slate-400 italic">Chỉ GVCN sửa</span>
-                      )}
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => handleOpenEditNote(note)}
+                          className="p-1 text-slate-500 hover:text-blue-600 hover:bg-slate-100 rounded-lg transition"
+                          title="Sửa lời khen"
+                        >
+                          <Edit3 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteNote(note.id)}
+                          className="p-1 text-slate-500 hover:text-rose-600 hover:bg-slate-100 rounded-lg transition"
+                          title="Xóa lời khen"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
                   </div>
 
