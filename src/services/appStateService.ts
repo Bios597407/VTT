@@ -2552,7 +2552,6 @@ class AppStateService {
 
   // --- Group Scoring & Rankings ---
   public getGroupWeeklyScores(weekNumber: number = 1) {
-    this.calculateAllWeeklyScores(weekNumber);
     const approvedIncidents = this.incidents.filter(
       (i) => i.incident_status === 'approved' && getWeekNumberForDate(i.date) === weekNumber
     );
@@ -3207,7 +3206,7 @@ class AppStateService {
   }
 
   // --- Scoring & Snapshot Calculations ---
-  public calculateAllWeeklyScores(weekNumber: number = 0) {
+  public calculateAllWeeklyScores(weekNumber: number = 0, triggerNotify: boolean = true) {
     // Calculate for target week OR all weeks if 0 passed
     const weeksToCalculate = weekNumber > 0 ? [weekNumber] : Array.from({ length: 36 }, (_, i) => i + 1);
 
@@ -3265,7 +3264,9 @@ class AppStateService {
       this.weeklySnapshots = [...this.weeklySnapshots.filter((s) => !(s.is_current && s.week_number === wNum)), ...newSnapshots];
     }
 
-    this.notify();
+    if (triggerNotify) {
+      this.notify();
+    }
   }
 
   // --- Period Locks ---

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { appState } from '../services/appStateService';
 import { getWeekDateRange } from '../domain/scoring/scoringEngine';
 import { Copy, Check, MessageCircle, X, Sparkles, Send } from 'lucide-react';
@@ -14,9 +14,12 @@ export const ZaloReportModal: React.FC<Props> = ({ isOpen, onClose }) => {
   const [showViolatorNames, setShowViolatorNames] = useState<boolean>(true);
   const [copied, setCopied] = useState<boolean>(false);
 
-  if (!isOpen) return null;
+  const reportText = useMemo(() => {
+    if (!isOpen) return '';
+    return appState.generateZaloWeeklyReport(weekNumber, customNotes, showViolatorNames);
+  }, [isOpen, weekNumber, customNotes, showViolatorNames]);
 
-  const reportText = appState.generateZaloWeeklyReport(weekNumber, customNotes, showViolatorNames);
+  if (!isOpen) return null;
 
   const handleCopy = async () => {
     try {
