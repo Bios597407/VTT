@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { appState } from '../services/appStateService';
+import { getWeekDateRange } from '../domain/scoring/scoringEngine';
 import { Copy, Check, MessageCircle, X, Sparkles, Send } from 'lucide-react';
 
 interface Props {
@@ -72,11 +73,14 @@ export const ZaloReportModal: React.FC<Props> = ({ isOpen, onClose }) => {
               onChange={(e) => setWeekNumber(Number(e.target.value))}
               className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl font-bold text-slate-900 shadow-xs cursor-pointer focus:ring-2 focus:ring-blue-500"
             >
-              {Array.from({ length: 36 }, (_, i) => i + 1).map((w) => (
-                <option key={w} value={w}>
-                  Tuần {w < 10 ? '0' + w : w} (Học kỳ {w <= 18 ? 'I' : 'II'})
-                </option>
-              ))}
+              {Array.from({ length: 36 }, (_, i) => i + 1).map((w) => {
+                const r = getWeekDateRange(w);
+                return (
+                  <option key={w} value={w}>
+                    {r.optionLabel}
+                  </option>
+                );
+              })}
             </select>
           </div>
 

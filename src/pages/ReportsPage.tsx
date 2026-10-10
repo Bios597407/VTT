@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { appState } from '../services/appStateService';
 import { ExcelService } from '../services/excelService';
-import { FileSpreadsheet, Printer, Download, FileText, CheckCircle2, MessageCircle, FileCheck, Sparkles } from 'lucide-react';
+import { FileSpreadsheet, Printer, Download, FileText, CheckCircle2, MessageCircle, FileCheck, Sparkles, Calendar } from 'lucide-react';
 import { ZaloReportModal } from '../components/ZaloReportModal';
 import { StudentReportCardModal } from '../components/StudentReportCardModal';
 import { formatIncidentDeductionRationale } from '../domain/incidents/conductCatalog';
+import { getWeekDateRange, formatStudentWeeklyAttendance, getWeekNumberForDate } from '../domain/scoring/scoringEngine';
 
 export const ReportsPage: React.FC = () => {
   const students = appState.students;
@@ -12,14 +13,24 @@ export const ReportsPage: React.FC = () => {
   const attendance = appState.attendance;
   const incidents = appState.incidents;
 
+  const [selectedWeek, setSelectedWeek] = useState<number>(1);
   const [printPreview, setPrintPreview] = useState(false);
   const [showZaloModal, setShowZaloModal] = useState(false);
   const [showCardsModal, setShowCardsModal] = useState(false);
 
+  const range = getWeekDateRange(selectedWeek);
+
   const handleExportWeek = () => {
-    const currentSnaps = weeklySnapshots.filter((s) => s.week_number === 1 && s.is_current);
-    ExcelService.exportWeeklyScoreExcel(students, currentSnaps, 1, 'Tuần 1');
-    appState.showToast('Đã tải xuống bảng điểm rèn luyện tuần (.xlsx)!', 'success');
+    const currentSnaps = weeklySnapshots.filter((s) => s.week_number === selectedWeek && s.is_current);
+    ExcelService.exportWeeklyScoreExcel(
+      students,
+      currentSnaps,
+      selectedWeek,
+      range.optionLabel,
+      attendance,
+      range.fullRangeText
+    );
+    appState.showToast(`Đã tải xuống bảng điểm rèn luyện Tuần ${selectedWeek} (${range.shortRange})!`, 'success');
   };
 
   const handleExportAttendance = () => {
@@ -122,6 +133,31 @@ export const ReportsPage: React.FC = () => {
         </div>
       </div>
 
+      {/* Week Selector Bar */}
+      <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+        <div className="flex items-center gap-3">
+          <Calendar className="w-4 h-4 text-blue-700 shrink-0" />
+          <span className="font-bold text-slate-800">Chọn tuần để xuất báo cáo / in biên bản:</span>
+          <select
+            value={selectedWeek}
+            onChange={(e) => setSelectedWeek(Number(e.target.value))}
+            className="px-3 py-1.5 bg-white border border-slate-300 rounded-xl font-bold text-blue-800 shadow-xs cursor-pointer focus:ring-2 focus:ring-blue-500"
+          >
+            {Array.from({ length: 18 }, (_, i) => i + 1).map((w) => {
+              const r = getWeekDateRange(w);
+              return (
+                <option key={w} value={w}>
+                  {r.optionLabel}
+                </option>
+              );
+            })}
+          </select>
+        </div>
+        <div className="text-slate-600 font-semibold font-mono text-[11px] bg-blue-50 px-3 py-1 rounded-lg border border-blue-200">
+          🗓️ {range.fullRangeText}
+        </div>
+      </div>
+
       {/* Excel Export Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Card 1: Weekly Conduct Excel */}
@@ -211,9 +247,12 @@ export const ReportsPage: React.FC = () => {
             <div className="text-sm font-black uppercase text-slate-900">
               TRƯỜNG THPT VÕ TRƯỜNG TOẢN — LỚP 10A16
             </div>
-            <h2 className="text-base font-extrabold text-blue-900 pt-2 uppercase">
-              BIÊN BẢN ĐÁNH GIÁ KẾT QUẢ RÈN LUYỆN VÀ NỀ NẾP TUẦN
+            <h2 className="text-base sm:text-lg font-black text-blue-900 pt-2 uppercase tracking-wide">
+              BIÊN BẢN ĐÁNH GIÁ KẾT QUẢ RÈN LUYỆN VÀ NỀ NẾP TUẦN {selectedWeek}
             </h2>
+            <div className="text-xs font-bold text-slate-800 uppercase tracking-tight">
+              ({range.fullRangeText.toUpperCase()})
+            </div>
             <div className="text-xs text-slate-600 italic">
               Năm học {appState.classInfo.academic_year} • Sĩ số: 43 học sinh • Giáo viên chủ nhiệm: {appState.classInfo.gvcn_name}
             </div>
@@ -230,13 +269,19 @@ export const ReportsPage: React.FC = () => {
                   <th className="p-2 border border-slate-300 text-center">Thưởng</th>
                   <th className="p-2 border border-slate-300 text-center text-rose-800">Trừ</th>
                   <th className="p-2 border border-slate-300 text-center font-bold">Điểm số</th>
-                  <th className="p-2 border border-slate-300 min-w-[220px]">📌 Lý giải nguyên nhân trừ điểm (QĐ 525)</th>
+                  <th className="p-2 border border-slate-300">📋 Chuyên cần</th>
+                  <th className="p-2 border border-slate-300 min-w-[200px]">📌 Lý giải nguyên nhân trừ điểm (QĐ 525)</th>
                 </tr>
               </thead>
               <tbody>
                 {students.map((stu, idx) => {
-                  const snap = weeklySnapshots.find((s) => s.student_id === stu.id && s.is_current);
-                  const stuIncidents = incidents.filter((inc) => inc.student_id === stu.id && inc.incident_status === 'approved');
+                  const snap = weeklySnapshots.find((s) => s.student_id === stu.id && s.week_number === selectedWeek && s.is_current);
+                  const stuIncidents = incidents.filter((inc) => {
+                    if (inc.student_id !== stu.id || inc.incident_status !== 'approved') return false;
+                    const incWeek = getWeekNumberForDate(inc.date);
+                    return incWeek === selectedWeek;
+                  });
+                  const attSummary = formatStudentWeeklyAttendance(stu.id, selectedWeek, attendance);
 
                   // Format reasons string according to QĐ 525
                   let rationaleDisplay = '✅ Nề nếp tốt, không bị trừ điểm';
@@ -260,6 +305,9 @@ export const ReportsPage: React.FC = () => {
                       </td>
                       <td className="p-1.5 border border-slate-300 text-center font-black text-blue-900 font-mono text-xs">
                         {snap?.official_week_score ?? '8.0'}
+                      </td>
+                      <td className="p-1.5 border border-slate-300 text-slate-800 font-medium text-[11px] whitespace-nowrap">
+                        {attSummary.displayText}
                       </td>
                       <td className="p-1.5 border border-slate-300 text-slate-700 text-[11px] leading-snug">
                         {rationaleDisplay}

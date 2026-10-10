@@ -44,6 +44,142 @@ export function getWeekNumberForDate(dateStr?: string | null): number {
   return Math.max(1, Math.min(36, weekNum));
 }
 
+export interface WeekDateRange {
+  weekNumber: number;
+  startDate: Date;
+  endDate: Date;
+  startDateStr: string;  // e.g. "07/09/2026"
+  endDateStr: string;    // e.g. "12/09/2026"
+  shortRange: string;    // e.g. "07/09 - 12/09"
+  noYearRange: string;   // e.g. "7/9 - 12/9"
+  optionLabel: string;   // e.g. "Tuần 1 (07/09 - 12/09)"
+  fullRangeText: string; // e.g. "Từ ngày 07/09/2026 đến ngày 12/09/2026"
+}
+
+export function getWeekDateRange(weekNum: number): WeekDateRange {
+  const w = Math.max(1, Math.min(36, weekNum));
+  const startMs = new Date(2026, 8, 7).getTime() + (w - 1) * 7 * 24 * 60 * 60 * 1000;
+  const startDate = new Date(startMs);
+  const endDate = new Date(startMs + 5 * 24 * 60 * 60 * 1000);
+
+  const pad = (n: number) => (n < 10 ? '0' + n : '' + n);
+
+  const sDay = startDate.getDate();
+  const sMonth = startDate.getMonth() + 1;
+  const sYear = startDate.getFullYear();
+
+  const eDay = endDate.getDate();
+  const eMonth = endDate.getMonth() + 1;
+  const eYear = endDate.getFullYear();
+
+  const startDateStr = `${pad(sDay)}/${pad(sMonth)}/${sYear}`;
+  const endDateStr = `${pad(eDay)}/${pad(eMonth)}/${eYear}`;
+  const shortRange = `${pad(sDay)}/${pad(sMonth)} - ${pad(eDay)}/${pad(eMonth)}`;
+  const noYearRange = `${sDay}/${sMonth} - ${eDay}/${eMonth}`;
+  const optionLabel = `Tuần ${w} (${shortRange})`;
+  const fullRangeText = `Từ ngày ${startDateStr} đến ngày ${endDateStr}`;
+
+  return {
+    weekNumber: w,
+    startDate,
+    endDate,
+    startDateStr,
+    endDateStr,
+    shortRange,
+    noYearRange,
+    optionLabel,
+    fullRangeText,
+  };
+}
+
+export interface StudentWeeklyAttendanceSummary {
+  hasAbsence: boolean;
+  permittedCount: number;
+  unpermittedCount: number;
+  lateCount: number;
+  displayText: string;
+  shortText: string;
+  details: string[];
+}
+
+export function formatStudentWeeklyAttendance(
+  studentId: string,
+  weekNum: number,
+  attendanceRecords: any[]
+): StudentWeeklyAttendanceSummary {
+  const weekRecords = (attendanceRecords || []).filter((rec) => {
+    if (!rec || rec.student_id !== studentId) return false;
+    return getWeekNumberForDate(rec.date) === weekNum;
+  });
+
+  const dayLabels: Record<number, string> = {
+    1: 'T2',
+    2: 'T3',
+    3: 'T4',
+    4: 'T5',
+    5: 'T6',
+    6: 'T7',
+    0: 'CN',
+  };
+
+  let permittedCount = 0;
+  let unpermittedCount = 0;
+  let lateCount = 0;
+  const details: string[] = [];
+
+  for (const rec of weekRecords) {
+    if (rec.status === 'present') continue;
+
+    const d = new Date(rec.date + 'T00:00:00');
+    const dayName = !isNaN(d.getTime()) ? dayLabels[d.getDay()] || 'T' : 'Ng';
+
+    if (rec.status === 'permitted_absence') {
+      permittedCount++;
+      details.push(`${dayName} (CP)`);
+    } else if (rec.status === 'unpermitted_absence') {
+      unpermittedCount++;
+      details.push(`${dayName} (KP)`);
+    } else if (rec.status === 'absence_pending_verification') {
+      permittedCount++;
+      details.push(`${dayName} (Chờ CP)`);
+    } else if (rec.status === 'late') {
+      lateCount++;
+      details.push(`${dayName} (Trễ)`);
+    } else if (rec.status === 'truancy') {
+      unpermittedCount++;
+      details.push(`${dayName} (Trốn tiết)`);
+    } else if (rec.status === 'permitted_early_leave') {
+      permittedCount++;
+      details.push(`${dayName} (Về sớm-CP)`);
+    } else if (rec.status === 'unauthorized_early_leave') {
+      unpermittedCount++;
+      details.push(`${dayName} (Về sớm-KP)`);
+    }
+  }
+
+  const hasAbsence = details.length > 0;
+  let shortText = '';
+  let displayText = '';
+
+  if (!hasAbsence) {
+    shortText = 'Đủ (0 vắng)';
+    displayText = '✅ Đủ (0 vắng)';
+  } else {
+    shortText = `Vắng ${details.join(', ')}`;
+    displayText = `⚠️ Vắng ${details.join(', ')}`;
+  }
+
+  return {
+    hasAbsence,
+    permittedCount,
+    unpermittedCount,
+    lateCount,
+    displayText,
+    shortText,
+    details,
+  };
+}
+
 /**
  * Calculate weekly conduct score.
  * Base score = 8 points.

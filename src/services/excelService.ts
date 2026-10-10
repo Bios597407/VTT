@@ -1,5 +1,6 @@
 import * as XLSX from 'xlsx';
 import { Student, WeekScoreSnapshot, AttendanceRecord, Incident, RewardRecord, ConductLevel } from '../types';
+import { formatStudentWeeklyAttendance, getWeekDateRange } from '../domain/scoring/scoringEngine';
 
 export interface ImportStudentRow {
   stt?: number | string;
@@ -143,10 +144,15 @@ export class ExcelService {
     students: Student[],
     snapshots: WeekScoreSnapshot[],
     weekNumber: number,
-    weekName: string
+    weekName?: string,
+    attendance: AttendanceRecord[] = [],
+    fullRangeText?: string
   ): void {
+    const range = getWeekDateRange(weekNumber);
+
     const data = students.map((stu, index) => {
       const snap = snapshots.find((s) => s.student_id === stu.id);
+      const attSummary = formatStudentWeeklyAttendance(stu.id, weekNumber, attendance);
       return {
         'STT': index + 1,
         'Mã học sinh': stu.student_code,
@@ -154,6 +160,7 @@ export class ExcelService {
         'Điểm ban đầu': 8,
         'Điểm khen thưởng (+)': snap ? snap.reward_points : 0,
         'Điểm trừ (-)': snap ? snap.deduction_points : 0,
+        'Chuyên cần': attSummary.shortText,
         'Điểm thô': snap?.raw_week_score ?? 'Chưa tính',
         'Điểm chính thức': snap?.official_week_score ?? 'Chưa tính',
         'Trạng thái': snap?.status === 'locked' ? 'Đã khóa' : 'Bản nháp',
@@ -163,7 +170,8 @@ export class ExcelService {
     const worksheet = XLSX.utils.json_to_sheet(data);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, `Tuan_${weekNumber}`);
-    XLSX.writeFile(workbook, `VTT_10A16_Diem_Ren_Luyen_Tuan_${weekNumber}.xlsx`);
+    const safeDateRangeStr = range.shortRange.replace(/\//g, '-');
+    XLSX.writeFile(workbook, `VTT_10A16_Diem_Ren_Luyen_Tuan_${weekNumber}_(${safeDateRangeStr}).xlsx`);
   }
 
   /**

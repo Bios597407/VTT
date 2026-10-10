@@ -28,6 +28,8 @@ import { OFFICIAL_PENDING_RULES } from '../domain/scoring/pendingRules';
 import {
   calculateWeeklyScore,
   getWeekNumberForDate,
+  getWeekDateRange,
+  formatStudentWeeklyAttendance,
 } from '../domain/scoring/scoringEngine';
 import { OFFICIAL_CONDUCT_CATALOG, ConductCatalogItem, formatIncidentDeductionRationale } from '../domain/incidents/conductCatalog';
 import { isSupabaseConfigured, supabase } from '../lib/supabaseClient';
@@ -2489,15 +2491,17 @@ class AppStateService {
   public generateZaloWeeklyReport(weekNumber: number = 1, customNotes: string = '', showViolatorNames: boolean = true): string {
     const classInfo = this.classInfo;
     const totalStudents = this.students.length;
+    const range = getWeekDateRange(weekNumber);
 
-    // Filter attendance
-    const permittedAbsences = this.attendance.filter((a) => a.status === 'permitted_absence').length;
-    const unpermittedAbsences = this.attendance.filter((a) => a.status === 'unpermitted_absence' || a.status === 'truancy').length;
-    const totalLates = this.attendance.filter((a) => a.status === 'late').length;
+    // Filter attendance for the selected week
+    const weekAttendance = this.attendance.filter((a) => getWeekNumberForDate(a.date) === weekNumber);
+    const permittedAbsences = weekAttendance.filter((a) => a.status === 'permitted_absence' || a.status === 'absence_pending_verification').length;
+    const unpermittedAbsences = weekAttendance.filter((a) => a.status === 'unpermitted_absence' || a.status === 'truancy').length;
+    const totalLates = weekAttendance.filter((a) => a.status === 'late').length;
 
     // Incidents & Rewards
-    const approvedIncidents = this.incidents.filter((i) => i.incident_status === 'approved');
-    const approvedRewards = this.rewards.filter((r) => r.status === 'approved');
+    const approvedIncidents = this.incidents.filter((i) => i.incident_status === 'approved' && getWeekNumberForDate(i.date) === weekNumber);
+    const approvedRewards = this.rewards.filter((r) => r.status === 'approved' && getWeekNumberForDate(r.date) === weekNumber);
 
     // Group scores calculation
     const weeklySnaps = this.weeklySnapshots.filter((s) => s.week_number === weekNumber && s.is_current);
@@ -2516,7 +2520,8 @@ class AppStateService {
 
     const topGroup = groupScores[0];
 
-    let text = `📣 [BÁO CÁO NỀ NẾP & THI ĐƯA TUẦN ${weekNumber < 10 ? '0' + weekNumber : weekNumber}]\n`;
+    let text = `📣 [BÁO CÁO NỀ NẾP & THI ĐƯA TUẦN ${weekNumber}]\n`;
+    text += `🗓️ THỜI GIAN: ${range.fullRangeText.toUpperCase()}\n`;
     text += `🏫 LỚP ${classInfo.class_name.toUpperCase()} - TRƯỜNG THPT VÕ TRƯỜNG TOẢN\n`;
     text += `👨‍🏫 GVCN: ${classInfo.gvcn_name || 'Thầy Trần Duy Tân'} | Sĩ số: ${totalStudents}/${totalStudents} HS\n`;
     text += `────────────────────\n\n`;

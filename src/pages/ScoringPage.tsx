@@ -9,6 +9,8 @@ import {
   applySemesterRestrictions,
   calculateAnnualConduct,
   getWeekNumberForDate,
+  getWeekDateRange,
+  formatStudentWeeklyAttendance,
 } from '../domain/scoring/scoringEngine';
 import { tallyAttendance } from '../domain/attendance/attendanceRules';
 import { ExcelService } from '../services/excelService';
@@ -63,8 +65,16 @@ export const ScoringPage: React.FC = () => {
 
   const handleExportWeek = () => {
     const currentSnaps = weeklySnapshots.filter((s) => s.week_number === selectedWeek && s.is_current);
-    ExcelService.exportWeeklyScoreExcel(students, currentSnaps, selectedWeek, `Tuần ${selectedWeek}`);
-    appState.showToast(`Đã tải xuống tệp Excel Điểm Tuần ${selectedWeek}!`, 'success');
+    const range = getWeekDateRange(selectedWeek);
+    ExcelService.exportWeeklyScoreExcel(
+      students,
+      currentSnaps,
+      selectedWeek,
+      range.optionLabel,
+      appState.attendance,
+      range.fullRangeText
+    );
+    appState.showToast(`Đã tải xuống tệp Excel Điểm Tuần ${selectedWeek} (${range.shortRange})!`, 'success');
   };
 
   return (
@@ -142,13 +152,16 @@ export const ScoringPage: React.FC = () => {
                   setSelectedWeek(w);
                   appState.calculateAllWeeklyScores(w);
                 }}
-                className="px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg font-bold text-blue-700"
+                className="px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg font-bold text-blue-700 shadow-xs cursor-pointer"
               >
-                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18].map((w) => (
-                  <option key={w} value={w}>
-                    Tuần {w} (Học kỳ I)
-                  </option>
-                ))}
+                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18].map((w) => {
+                  const range = getWeekDateRange(w);
+                  return (
+                    <option key={w} value={w}>
+                      {range.optionLabel}
+                    </option>
+                  );
+                })}
               </select>
             </div>
             <div className="text-slate-500 text-[11px] hidden sm:block">
@@ -163,6 +176,7 @@ export const ScoringPage: React.FC = () => {
                 (s) => s.student_id === stu.id && s.week_number === selectedWeek && s.is_current
               );
               const score = snap?.official_week_score ?? 8.0;
+              const attSummary = formatStudentWeeklyAttendance(stu.id, selectedWeek, appState.attendance);
               return (
                 <div key={stu.id} className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between">
                   <div className="flex items-center gap-3">
@@ -177,6 +191,13 @@ export const ScoringPage: React.FC = () => {
                         Mã: {stu.student_code} · Thô: {snap?.raw_week_score ?? 8}đ
                         {(snap?.reward_points ?? 0) > 0 && <span className="text-emerald-600 font-bold"> (+{snap?.reward_points})</span>}
                         {(snap?.deduction_points ?? 0) > 0 && <span className="text-rose-600 font-bold"> (-{snap?.deduction_points})</span>}
+                      </div>
+                      <div className="text-[11px] font-medium text-slate-600 mt-1">
+                        Chuyên cần: {attSummary.hasAbsence ? (
+                          <span className="text-amber-800 font-bold">⚠️ Vắng {attSummary.details.join(', ')}</span>
+                        ) : (
+                          <span className="text-emerald-700 font-bold">✅ Đủ (0 vắng)</span>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -206,6 +227,9 @@ export const ScoringPage: React.FC = () => {
                     <th className="py-3 px-4 bg-rose-50/60 text-rose-900 border-x border-rose-100">
                       📌 Nguyên nhân bị trừ điểm (QĐ 525)
                     </th>
+                    <th className="py-3 px-4 bg-amber-50/70 text-amber-950 border-x border-amber-200">
+                      📋 Chuyên cần
+                    </th>
                     <th className="py-3 px-4">Điểm thô</th>
                     <th className="py-3 px-4 font-black text-blue-700">Điểm chính thức</th>
                     <th className="py-3 px-4">Phiên bản</th>
@@ -221,6 +245,7 @@ export const ScoringPage: React.FC = () => {
                       const incWeek = getWeekNumberForDate(i.date);
                       return incWeek === selectedWeek;
                     });
+                    const attSummary = formatStudentWeeklyAttendance(stu.id, selectedWeek, appState.attendance);
 
                     return (
                       <tr key={stu.id} className="hover:bg-slate-50">
@@ -245,6 +270,15 @@ export const ScoringPage: React.FC = () => {
                                 </div>
                               ))}
                             </div>
+                          )}
+                        </td>
+                        <td className="py-3 px-4 bg-amber-50/20 border-x border-amber-100 text-[11px]">
+                          {!attSummary.hasAbsence ? (
+                            <span className="text-emerald-700 font-semibold">✅ Đủ (0 vắng)</span>
+                          ) : (
+                            <span className="text-amber-900 font-bold bg-amber-100 px-2 py-0.5 rounded-md border border-amber-300 inline-block">
+                              ⚠️ Vắng {attSummary.details.join(', ')}
+                            </span>
                           )}
                         </td>
                         <td className="py-3 px-4 font-mono text-slate-600">
