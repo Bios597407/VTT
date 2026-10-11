@@ -164,13 +164,21 @@ class AppStateService {
   // Active toast notifications
   public toasts: ToastNotification[] = [];
 
-  // Current logged in user (Mặc định: GVCN Toàn quyền điều hành & quản lý)
+  public sanitizeOfficerAccounts(accounts: OfficerAccount[]): any[] {
+    if (!Array.isArray(accounts)) return [];
+    return accounts.map((acc) => {
+      const { pin, ...rest } = acc;
+      return { ...rest, pin: '***' };
+    });
+  }
+
+  // Current logged in user (Mặc định: Chế độ Học sinh / Khách xem, muốn thao tác phải xác thực)
   public currentUser: CurrentUser = {
-    id: 'user-gvcn',
-    name: 'Giáo viên Chủ nhiệm (GVCN)',
-    role: 'gvcn',
+    id: 'user-guest',
+    name: 'Học sinh / Khách xem',
+    role: 'hoc_sinh',
     class_id: 'class-10a16',
-    isAuthenticatedOfficer: true,
+    isAuthenticatedOfficer: false,
   };
 
   // Thông tin Quản lý Lớp học & Ban cán sự (GVCN toàn quyền thay đổi không hạn chế)
@@ -308,6 +316,14 @@ class AppStateService {
   public lockoutUntil: Record<string, number> = {};
   public sessionTimeoutMinutes: number = 15;
 
+  public saveLockoutState() {
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.setItem('VTT_LOCKOUT_UNTIL', JSON.stringify(this.lockoutUntil));
+      localStorage.setItem('VTT_FAILED_PIN_ATTEMPTS', JSON.stringify(this.failedPinAttempts));
+    } catch (e) {}
+  }
+
   public changeOfficerPin(accountId: string, oldPin: string, newPin: string): { success: boolean; message: string } {
     const acc = this.officerAccounts.find((a) => a.id === accountId);
     if (!acc) return { success: false, message: 'Không tìm thấy tài khoản cán sự.' };
@@ -339,7 +355,7 @@ class AppStateService {
         entity_type: 'officer_auth',
         entity_id: acc.id,
         reason: JSON.stringify({
-          officerAccounts: this.officerAccounts,
+          officerAccounts: this.sanitizeOfficerAccounts(this.officerAccounts),
           changedAt: new Date().toISOString(),
         }),
       }]).then();
@@ -354,15 +370,25 @@ class AppStateService {
   public clearFailedAttempts(role: string) {
     this.failedPinAttempts[role] = 0;
     delete this.lockoutUntil[role];
+    this.saveLockoutState();
   }
 
   public getLockoutRemainingSeconds(role: string): number {
+    if (typeof window !== 'undefined') {
+      try {
+        const savedLockout = localStorage.getItem('VTT_LOCKOUT_UNTIL');
+        if (savedLockout) {
+          this.lockoutUntil = JSON.parse(savedLockout);
+        }
+      } catch (e) {}
+    }
     const until = this.lockoutUntil[role];
     if (!until) return 0;
     const now = Date.now();
     if (now >= until) {
       delete this.lockoutUntil[role];
       this.failedPinAttempts[role] = 0;
+      this.saveLockoutState();
       return 0;
     }
     return Math.ceil((until - now) / 1000);
@@ -917,6 +943,11 @@ class AppStateService {
           const parsed = JSON.parse(savedAuditLogs);
           if (Array.isArray(parsed)) this.auditLogs = parsed;
         }
+
+        const savedFailed = localStorage.getItem('VTT_FAILED_PIN_ATTEMPTS');
+        if (savedFailed) this.failedPinAttempts = JSON.parse(savedFailed);
+        const savedLockout = localStorage.getItem('VTT_LOCKOUT_UNTIL');
+        if (savedLockout) this.lockoutUntil = JSON.parse(savedLockout);
       } catch (e) {
         console.warn('Lỗi đọc dữ liệu lớp từ localStorage:', e);
       }
@@ -928,22 +959,22 @@ class AppStateService {
     // Tính toán lại toàn bộ điểm số tuần dựa trên dữ liệu đã nạp từ LocalStorage
     this.calculateAllWeeklyScores(0, false);
 
-    // MẶC ĐỊNH: GVCN Toàn quyền điều hành & quản lý toàn bộ hệ thống không hạn chế
+    // MẶC ĐỊNH: Chế độ Học sinh (Chỉ xem). Cần xác thực PIN/Gmail để kích hoạt quyền GVCN / Ban Cán Sự
     if (typeof window !== 'undefined') {
       try {
         const savedRole = localStorage.getItem('VTT_CURRENT_ROLE');
-        if (savedRole === 'lop_truong' || savedRole === 'lop_pho') {
-          this.setLoggedInRole(savedRole as RoleType);
-        } else if (savedRole === 'hoc_sinh') {
-          this.setLoggedInRole('hoc_sinh');
-        } else {
+        if (savedRole === 'gvcn') {
           this.setLoggedInRole('gvcn');
+        } else if (savedRole === 'lop_truong' || savedRole === 'lop_pho') {
+          this.setLoggedInRole(savedRole as RoleType);
+        } else {
+          this.setLoggedInRole('hoc_sinh');
         }
       } catch (e) {
-        this.setLoggedInRole('gvcn');
+        this.setLoggedInRole('hoc_sinh');
       }
     } else {
-      this.setLoggedInRole('gvcn');
+      this.setLoggedInRole('hoc_sinh');
     }
     this.startSessionTracking();
   }
@@ -962,10 +993,14 @@ class AppStateService {
 
   // --- High-Security Access Control Guards ---
   public isWriteAuthorized(): boolean {
-    return true; // Cho phép thực hiện đầy đủ thao tác quản trị, chỉnh sửa và lưu trữ
+    return this.currentUser.isAuthenticatedOfficer === true && this.currentUser.role !== 'hoc_sinh';
   }
 
   public checkWriteAuthorization(): boolean {
+    if (!this.isWriteAuthorized()) {
+      this.showToast('Chỉ Ban Cán Sự hoặc Giáo viên Chủ nhiệm mới có quyền thực hiện thao tác này!', 'warn');
+      return false;
+    }
     return true;
   }
 
@@ -1233,7 +1268,7 @@ class AppStateService {
           entity_id: 'class-10a16',
           reason: JSON.stringify({
             classInfo: this.classInfo,
-            officerAccounts: this.officerAccounts,
+            officerAccounts: this.sanitizeOfficerAccounts(this.officerAccounts),
             groups: this.groups,
             seatingPlans: this.seatingPlans,
             activeSeatingPlanId: this.activeSeatingPlanId,
@@ -1546,7 +1581,7 @@ class AppStateService {
           entity_id: 'class-10a16',
           reason: JSON.stringify({
             classInfo: this.classInfo,
-            officerAccounts: this.officerAccounts,
+            officerAccounts: this.sanitizeOfficerAccounts(this.officerAccounts),
             groups: this.groups,
           }),
         }]);
@@ -1604,7 +1639,7 @@ class AppStateService {
           entity_id: 'class-10a16',
           reason: JSON.stringify({
             classInfo: this.classInfo,
-            officerAccounts: this.officerAccounts,
+            officerAccounts: this.sanitizeOfficerAccounts(this.officerAccounts),
             groups: this.groups,
           }),
         }]);
@@ -1640,7 +1675,7 @@ class AppStateService {
         entity_id: 'class-10a16',
         reason: JSON.stringify({
           classInfo: this.classInfo,
-          officerAccounts: this.officerAccounts,
+          officerAccounts: this.sanitizeOfficerAccounts(this.officerAccounts),
           groups: this.groups,
         }),
       }]).then();
@@ -1693,7 +1728,7 @@ class AppStateService {
         entity_id: 'class-10a16',
         reason: JSON.stringify({
           classInfo: this.classInfo,
-          officerAccounts: this.officerAccounts,
+          officerAccounts: this.sanitizeOfficerAccounts(this.officerAccounts),
           groups: this.groups,
         }),
       }]).then();
@@ -1715,7 +1750,7 @@ class AppStateService {
         entity_id: 'class-10a16',
         reason: JSON.stringify({
           classInfo: this.classInfo,
-          officerAccounts: this.officerAccounts,
+          officerAccounts: this.sanitizeOfficerAccounts(this.officerAccounts),
           groups: this.groups,
         }),
       }]).then();
@@ -1737,7 +1772,7 @@ class AppStateService {
         entity_id: 'class-10a16',
         reason: JSON.stringify({
           classInfo: this.classInfo,
-          officerAccounts: this.officerAccounts,
+          officerAccounts: this.sanitizeOfficerAccounts(this.officerAccounts),
           groups: this.groups,
         }),
       }]).then();
@@ -1852,6 +1887,7 @@ class AppStateService {
       if (attempts >= 5) {
         // Lock out for 3 minutes (180s)
         this.lockoutUntil[lockKey] = Date.now() + 180 * 1000;
+        this.saveLockoutState();
         this.addAuditLog('Hệ thống Bảo mật', `CẢNH BÁO: Phát hiện dò PIN sai ${attempts} lần liên tiếp cho ${found.title}. Đã kích hoạt Khóa Tạm Thời 3 phút!`, 'security_alert', found.id);
         this.notify();
         return {
@@ -1860,6 +1896,7 @@ class AppStateService {
         };
       }
 
+      this.saveLockoutState();
       this.addAuditLog('Hệ thống Bảo mật', `Nhập sai mã PIN lần thứ ${attempts}/5 cho ${found.title}`, 'auth_failed', found.id);
       return {
         success: false,
@@ -3883,7 +3920,7 @@ class AppStateService {
         entity_id: 'class-10a16',
         reason: JSON.stringify({
           classInfo: this.classInfo,
-          officerAccounts: this.officerAccounts,
+          officerAccounts: this.sanitizeOfficerAccounts(this.officerAccounts),
           groups: this.groups,
           seatingPlans: this.seatingPlans,
           activeSeatingPlanId: this.activeSeatingPlanId,
