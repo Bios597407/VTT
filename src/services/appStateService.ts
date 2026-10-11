@@ -3099,6 +3099,11 @@ class AppStateService {
 
   // --- Rewards ---
   public submitReward(reward: Omit<RewardRecord, 'id' | 'created_at'>): { success: boolean; id: string; warning?: string } {
+    if (this.currentUser.role !== 'gvcn') {
+      this.showToast('Chỉ Giáo viên chủ nhiệm (GVCN) mới có quyền ghi nhận khen thưởng!', 'warn');
+      return { success: false, id: '' };
+    }
+
     const isDup = this.rewards.some(
       (r) => r.student_id === reward.student_id && r.reward_code === reward.reward_code && r.date === reward.date
     );
@@ -3141,6 +3146,11 @@ class AppStateService {
   }
 
   public reviewReward(rewardId: string, approved: boolean) {
+    if (this.currentUser.role !== 'gvcn') {
+      this.showToast('Chỉ Giáo viên chủ nhiệm (GVCN) mới có quyền phê duyệt/từ chối khen thưởng!', 'warn');
+      return;
+    }
+
     const rew = this.rewards.find((r) => r.id === rewardId);
     if (!rew) return;
 
@@ -3163,6 +3173,11 @@ class AppStateService {
 
   // --- Positive Notes ---
   public addPositiveNote(note: Omit<PositiveNote, 'id' | 'created_at'>) {
+    if (this.currentUser.role !== 'gvcn') {
+      this.showToast('Chỉ Giáo viên chủ nhiệm (GVCN) mới có quyền gửi lời khen tích cực!', 'warn');
+      return;
+    }
+
     const id = generateUUID();
     const newNote: PositiveNote = { ...note, id, created_at: new Date().toISOString() };
     this.positiveNotes.unshift(newNote);
@@ -3190,6 +3205,11 @@ class AppStateService {
   }
 
   public updatePositiveNote(id: string, updated: Partial<PositiveNote>) {
+    if (this.currentUser.role !== 'gvcn') {
+      this.showToast('Chỉ Giáo viên chủ nhiệm (GVCN) mới có quyền sửa lời khen tích cực!', 'warn');
+      return;
+    }
+
     const index = this.positiveNotes.findIndex((n) => n.id === id);
     if (index < 0) return;
     this.positiveNotes[index] = { ...this.positiveNotes[index], ...updated };
@@ -3213,6 +3233,11 @@ class AppStateService {
   }
 
   public deletePositiveNote(id: string) {
+    if (this.currentUser.role !== 'gvcn') {
+      this.showToast('Chỉ Giáo viên chủ nhiệm (GVCN) mới có quyền xóa lời khen tích cực!', 'warn');
+      return;
+    }
+
     this.positiveNotes = this.positiveNotes.filter((n) => n.id !== id);
     this.saveLocalState();
     this.addAuditLog(this.currentUser.name || 'Người dùng', 'Xóa lời khen tích cực', 'positive_note', id);
@@ -3227,6 +3252,11 @@ class AppStateService {
 
   // --- Rewards Edit & Delete ---
   public updateReward(id: string, updated: Partial<RewardRecord>) {
+    if (this.currentUser.role !== 'gvcn') {
+      this.showToast('Chỉ Giáo viên chủ nhiệm (GVCN) mới có quyền sửa điểm khen thưởng!', 'warn');
+      return;
+    }
+
     const index = this.rewards.findIndex((r) => r.id === id);
     if (index >= 0) {
       this.rewards[index] = { ...this.rewards[index], ...updated };
@@ -3249,6 +3279,11 @@ class AppStateService {
   }
 
   public deleteReward(id: string) {
+    if (this.currentUser.role !== 'gvcn') {
+      this.showToast('Chỉ Giáo viên chủ nhiệm (GVCN) mới có quyền xóa ghi nhận khen thưởng!', 'warn');
+      return;
+    }
+
     this.rewards = this.rewards.filter((r) => r.id !== id);
     this.calculateAllWeeklyScores(0, true);
     this.saveLocalState();
