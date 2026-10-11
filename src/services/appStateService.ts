@@ -3307,6 +3307,10 @@ class AppStateService {
   }
 
   public updateQualitativeComment(id: string, updated: Partial<QualitativeComment>) {
+    if (this.currentUser.role !== 'gvcn') {
+      this.showToast('Chỉ Giáo viên chủ nhiệm (GVCN) mới có quyền chỉnh sửa nhận xét!', 'warn');
+      return;
+    }
     const index = this.qualitativeComments.findIndex((c) => c.id === id);
     if (index >= 0) {
       this.qualitativeComments[index] = { ...this.qualitativeComments[index], ...updated };
@@ -3318,6 +3322,10 @@ class AppStateService {
   }
 
   public deleteQualitativeComment(id: string) {
+    if (this.currentUser.role !== 'gvcn') {
+      this.showToast('Chỉ Giáo viên chủ nhiệm (GVCN) mới có quyền xóa nhận xét!', 'warn');
+      return;
+    }
     this.qualitativeComments = this.qualitativeComments.filter((c) => c.id !== id);
     this.saveLocalState();
     this.addAuditLog(this.currentUser.name || 'Người dùng', 'Xóa nhận xét định tính', 'qualitative_comment', id);
@@ -3336,6 +3344,10 @@ class AppStateService {
   }
 
   public updateSupportPlan(id: string, updated: Partial<SupportPlan>) {
+    if (this.currentUser.role !== 'gvcn') {
+      this.showToast('Chỉ Giáo viên chủ nhiệm (GVCN) mới có quyền chỉnh sửa kế hoạch hỗ trợ!', 'warn');
+      return;
+    }
     const index = this.supportPlans.findIndex((p) => p.id === id);
     if (index >= 0) {
       this.supportPlans[index] = { ...this.supportPlans[index], ...updated };
@@ -3347,6 +3359,10 @@ class AppStateService {
   }
 
   public deleteSupportPlan(id: string) {
+    if (this.currentUser.role !== 'gvcn') {
+      this.showToast('Chỉ Giáo viên chủ nhiệm (GVCN) mới có quyền xóa kế hoạch hỗ trợ!', 'warn');
+      return;
+    }
     this.supportPlans = this.supportPlans.filter((p) => p.id !== id);
     this.saveLocalState();
     this.addAuditLog(this.currentUser.name || 'Người dùng', 'Xóa kế hoạch hỗ trợ', 'support_plan', id);

@@ -25,6 +25,7 @@ export const QualitativePage: React.FC = () => {
 
   const students = appState.students;
   const currentUser = appState.currentUser;
+  const isGvcn = currentUser.role === 'gvcn';
   const comments = appState.qualitativeComments;
   const plans = appState.supportPlans;
 
@@ -84,6 +85,10 @@ export const QualitativePage: React.FC = () => {
   };
 
   const handleOpenEditComment = (comment: QualitativeComment) => {
+    if (!isGvcn) {
+      appState.showToast('Chỉ Giáo viên chủ nhiệm (GVCN) mới có quyền chỉnh sửa nhận xét!', 'warn');
+      return;
+    }
     setEditingComment(comment);
     setEditCommentStudentId(comment.studentId || students[0]?.id || '');
     setEditCommentContent(comment.content);
@@ -92,6 +97,10 @@ export const QualitativePage: React.FC = () => {
 
   const handleSaveEditComment = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isGvcn) {
+      appState.showToast('Chỉ Giáo viên chủ nhiệm (GVCN) mới có quyền chỉnh sửa nhận xét!', 'warn');
+      return;
+    }
     if (!editingComment || !editCommentContent.trim()) return;
 
     appState.updateQualitativeComment(editingComment.id, {
@@ -105,6 +114,10 @@ export const QualitativePage: React.FC = () => {
   };
 
   const handleDeleteComment = (id: string) => {
+    if (!isGvcn) {
+      appState.showToast('Chỉ Giáo viên chủ nhiệm (GVCN) mới có quyền xóa nhận xét!', 'warn');
+      return;
+    }
     appState.deleteQualitativeComment(id);
     appState.showToast('Đã xóa nhận xét thành công!', 'info');
   };
@@ -132,6 +145,10 @@ export const QualitativePage: React.FC = () => {
   };
 
   const handleOpenEditPlan = (plan: SupportPlan) => {
+    if (!isGvcn) {
+      appState.showToast('Chỉ Giáo viên chủ nhiệm (GVCN) mới có quyền chỉnh sửa kế hoạch hỗ trợ!', 'warn');
+      return;
+    }
     setEditingPlan(plan);
     setEditPlanStudentId(plan.studentId || students[0]?.id || '');
     setEditPlanObjective(plan.objective);
@@ -141,6 +158,10 @@ export const QualitativePage: React.FC = () => {
 
   const handleSaveEditPlan = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isGvcn) {
+      appState.showToast('Chỉ Giáo viên chủ nhiệm (GVCN) mới có quyền chỉnh sửa kế hoạch hỗ trợ!', 'warn');
+      return;
+    }
     if (!editingPlan || !editPlanObjective.trim() || !editPlanDescription.trim()) return;
 
     appState.updateSupportPlan(editingPlan.id, {
@@ -155,6 +176,10 @@ export const QualitativePage: React.FC = () => {
   };
 
   const handleDeletePlan = (id: string) => {
+    if (!isGvcn) {
+      appState.showToast('Chỉ Giáo viên chủ nhiệm (GVCN) mới có quyền xóa kế hoạch hỗ trợ!', 'warn');
+      return;
+    }
     appState.deleteSupportPlan(id);
     appState.showToast('Đã xóa kế hoạch hỗ trợ thành công!', 'info');
   };
@@ -327,23 +352,27 @@ export const QualitativePage: React.FC = () => {
                             {c.date}
                           </span>
 
-                          {/* Edit & Delete Buttons */}
-                          <div className="flex items-center gap-1">
-                            <button
-                              onClick={() => handleOpenEditComment(c)}
-                              className="p-1 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"
-                              title="Chỉnh sửa nội dung"
-                            >
-                              <Edit3 className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              onClick={() => handleDeleteComment(c.id)}
-                              className="p-1 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"
-                              title="Xóa nhận xét"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
+                          {/* Edit & Delete Buttons - Only GVCN can edit or delete */}
+                          {isGvcn ? (
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={() => handleOpenEditComment(c)}
+                                className="p-1 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition cursor-pointer"
+                                title="Chỉnh sửa nội dung"
+                              >
+                                <Edit3 className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteComment(c.id)}
+                                className="p-1 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
+                                title="Xóa nhận xét"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          ) : (
+                            <span className="text-[10px] text-slate-400 italic bg-slate-100 px-1.5 py-0.5 rounded">🔒 Không thể xóa</span>
+                          )}
                         </div>
                       </div>
 
@@ -407,21 +436,27 @@ export const QualitativePage: React.FC = () => {
                           {sp.status}
                         </span>
 
-                        {/* Edit & Delete Action Buttons */}
-                        <button
-                          onClick={() => handleOpenEditPlan(sp)}
-                          className="p-1 text-slate-400 hover:text-blue-600 hover:bg-white rounded-lg transition"
-                          title="Chỉnh sửa kế hoạch"
-                        >
-                          <Edit3 className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          onClick={() => handleDeletePlan(sp.id)}
-                          className="p-1 text-slate-400 hover:text-rose-600 hover:bg-white rounded-lg transition"
-                          title="Xóa kế hoạch"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                        {/* Edit & Delete Action Buttons - Only GVCN can edit or delete */}
+                        {isGvcn ? (
+                          <>
+                            <button
+                              onClick={() => handleOpenEditPlan(sp)}
+                              className="p-1 text-slate-400 hover:text-blue-600 hover:bg-white rounded-lg transition cursor-pointer"
+                              title="Chỉnh sửa kế hoạch"
+                            >
+                              <Edit3 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleDeletePlan(sp.id)}
+                              className="p-1 text-slate-400 hover:text-rose-600 hover:bg-white rounded-lg transition cursor-pointer"
+                              title="Xóa kế hoạch"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </>
+                        ) : (
+                          <span className="text-[10px] text-slate-400 italic bg-slate-100 px-1.5 py-0.5 rounded">🔒 Không thể xóa</span>
+                        )}
                       </div>
                     </div>
 
