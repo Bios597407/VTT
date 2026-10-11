@@ -57,11 +57,23 @@ export const QualitativePage: React.FC = () => {
   const [editPlanDescription, setEditPlanDescription] = useState('');
   const [editPlanStatus, setEditPlanStatus] = useState<SupportPlan['status']>('Đang thực hiện');
 
-  const canManage = true; // Cho phép thực hiện đầy đủ thao tác quản trị và đánh giá
+  const canManage = isGvcn; // Chỉ GVCN mới có quyền quản trị và thay đổi nội dung
+
+  const handleOpenAddPlanModal = () => {
+    if (!isGvcn) {
+      appState.showToast('Chỉ Giáo viên chủ nhiệm (GVCN) mới có quyền lập kế hoạch hỗ trợ!', 'warn');
+      return;
+    }
+    setShowAddPlanModal(true);
+  };
 
   // Handlers for Comment
   const handleAddComment = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isGvcn) {
+      appState.showToast('Chỉ Giáo viên chủ nhiệm (GVCN) mới có quyền ghi nhận và thay đổi đánh giá nhận xét!', 'warn');
+      return;
+    }
     if (!commentText.trim()) return;
 
     let authorName = currentUser.name;
@@ -125,6 +137,10 @@ export const QualitativePage: React.FC = () => {
   // Handlers for Support Plan
   const handleAddSupportPlan = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isGvcn) {
+      appState.showToast('Chỉ Giáo viên chủ nhiệm (GVCN) mới có quyền tạo lập kế hoạch hỗ trợ!', 'warn');
+      return;
+    }
     if (!planObjective.trim() || !planDescription.trim()) return;
 
     const targetStudentId = planStudentId || students[0]?.id || 'stu-01';
@@ -202,13 +218,17 @@ export const QualitativePage: React.FC = () => {
           </p>
         </div>
 
-        {activeTab === 'support' && canManage && (
+        {activeTab === 'support' && (
           <button
-            onClick={() => setShowAddPlanModal(true)}
-            className="flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl shadow-sm transition active:scale-95 cursor-pointer"
+            onClick={handleOpenAddPlanModal}
+            className={`flex items-center gap-1.5 px-3.5 py-2 text-white text-xs font-bold rounded-xl shadow-sm transition ${
+              isGvcn
+                ? 'bg-blue-600 hover:bg-blue-500 cursor-pointer active:scale-95'
+                : 'bg-slate-400 cursor-not-allowed opacity-80'
+            }`}
           >
-            <Plus className="w-4 h-4" />
-            Lập kế hoạch hỗ trợ mới
+            {isGvcn ? <Plus className="w-4 h-4" /> : <ShieldAlert className="w-4 h-4" />}
+            <span>Lập kế hoạch hỗ trợ mới</span>
           </button>
         )}
       </div>
@@ -253,13 +273,21 @@ export const QualitativePage: React.FC = () => {
               Ghi nhận xét / Đánh giá mới
             </h3>
 
+            {!isGvcn && (
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-xs font-semibold flex items-center gap-2">
+                <ShieldAlert className="w-4 h-4 text-amber-600 shrink-0" />
+                <span>Chỉ Giáo viên chủ nhiệm (GVCN) mới có quyền ghi nhận hoặc thay đổi nội dung này!</span>
+              </div>
+            )}
+
             <form onSubmit={handleAddComment} className="space-y-3 text-xs">
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">Chọn học sinh</label>
                 <select
+                  disabled={!isGvcn}
                   value={selectedStudentId}
                   onChange={(e) => setSelectedStudentId(e.target.value)}
-                  className="w-full p-2 border rounded-xl border-slate-300 font-semibold focus:ring-2 focus:ring-blue-500"
+                  className="w-full p-2 border rounded-xl border-slate-300 font-semibold focus:ring-2 focus:ring-blue-500 disabled:bg-slate-100 disabled:text-slate-500"
                 >
                   {students.map((s) => (
                     <option key={s.id} value={s.id}>
@@ -273,9 +301,10 @@ export const QualitativePage: React.FC = () => {
                 <label className="block font-semibold text-slate-700 mb-1">Ngày ghi nhận</label>
                 <input
                   type="date"
+                  disabled={!isGvcn}
                   value={commentDate}
                   onChange={(e) => setCommentDate(e.target.value)}
-                  className="w-full p-2 border rounded-xl border-slate-300 focus:ring-2 focus:ring-blue-500"
+                  className="w-full p-2 border rounded-xl border-slate-300 focus:ring-2 focus:ring-blue-500 disabled:bg-slate-100 disabled:text-slate-500"
                 />
               </div>
 
@@ -284,6 +313,7 @@ export const QualitativePage: React.FC = () => {
                 <textarea
                   rows={4}
                   required
+                  disabled={!isGvcn}
                   placeholder={
                     activeTab === 'teacher'
                       ? 'Nhận xét về thái độ, sự tiến bộ, tinh thần rèn luyện...'
@@ -295,15 +325,21 @@ export const QualitativePage: React.FC = () => {
                   }
                   value={commentText}
                   onChange={(e) => setCommentText(e.target.value)}
-                  className="w-full p-2.5 border rounded-xl border-slate-300 focus:ring-2 focus:ring-blue-500"
+                  className="w-full p-2.5 border rounded-xl border-slate-300 focus:ring-2 focus:ring-blue-500 disabled:bg-slate-100 disabled:text-slate-500"
                 />
               </div>
 
               <button
                 type="submit"
-                className="w-full py-2.5 font-bold bg-blue-600 hover:bg-blue-500 text-white rounded-xl shadow-sm transition active:scale-95 cursor-pointer"
+                disabled={!isGvcn}
+                className={`w-full py-2.5 font-bold text-white rounded-xl shadow-sm transition flex items-center justify-center gap-1.5 ${
+                  isGvcn
+                    ? 'bg-blue-600 hover:bg-blue-500 cursor-pointer active:scale-95'
+                    : 'bg-slate-400 cursor-not-allowed opacity-75'
+                }`}
               >
-                Lưu nhận xét
+                {!isGvcn && <ShieldAlert className="w-4 h-4" />}
+                <span>{isGvcn ? 'Lưu nhận xét' : 'Chỉ GVCN có quyền thay đổi'}</span>
               </button>
             </form>
           </div>

@@ -3334,6 +3334,10 @@ class AppStateService {
 
   // --- Qualitative Comments CRUD ---
   public addQualitativeComment(comment: Omit<QualitativeComment, 'id' | 'created_at'>) {
+    if (this.currentUser.role !== 'gvcn') {
+      this.showToast('Chỉ Giáo viên chủ nhiệm (GVCN) mới có quyền ghi nhận/thay đổi đánh giá định tính!', 'warn');
+      return;
+    }
     const id = `qc-${Date.now()}`;
     const newComment: QualitativeComment = { ...comment, id, created_at: new Date().toISOString() };
     this.qualitativeComments = [newComment, ...this.qualitativeComments];
@@ -3374,6 +3378,10 @@ class AppStateService {
 
   // --- Support Plans CRUD ---
   public addSupportPlan(plan: Omit<SupportPlan, 'id' | 'created_at'>) {
+    if (this.currentUser.role !== 'gvcn') {
+      this.showToast('Chỉ Giáo viên chủ nhiệm (GVCN) mới có quyền tạo lập/thay đổi kế hoạch hỗ trợ!', 'warn');
+      return;
+    }
     const id = `sp-${Date.now()}`;
     const newPlan: SupportPlan = { ...plan, id, created_at: new Date().toISOString() };
     this.supportPlans = [newPlan, ...this.supportPlans];
