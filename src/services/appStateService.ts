@@ -3340,6 +3340,7 @@ class AppStateService {
     this.saveLocalState();
     this.addAuditLog(this.currentUser.name || 'Người dùng', 'Thêm nhận xét định tính', 'qualitative_comment', id);
     this.notify();
+    this.syncAllToSupabase();
     return newComment;
   }
 
@@ -3355,6 +3356,7 @@ class AppStateService {
       this.saveLocalState();
       this.addAuditLog(this.currentUser.name || 'Người dùng', 'Chỉnh sửa nhận xét định tính', 'qualitative_comment', id);
       this.notify();
+      this.syncAllToSupabase();
     }
   }
 
@@ -3367,6 +3369,7 @@ class AppStateService {
     this.saveLocalState();
     this.addAuditLog(this.currentUser.name || 'Người dùng', 'Xóa nhận xét định tính', 'qualitative_comment', id);
     this.notify();
+    this.syncAllToSupabase();
   }
 
   // --- Support Plans CRUD ---
@@ -3377,6 +3380,7 @@ class AppStateService {
     this.saveLocalState();
     this.addAuditLog(this.currentUser.name || 'Người dùng', 'Thêm kế hoạch hỗ trợ sư phạm', 'support_plan', id);
     this.notify();
+    this.syncAllToSupabase();
     return newPlan;
   }
 
@@ -3392,6 +3396,7 @@ class AppStateService {
       this.saveLocalState();
       this.addAuditLog(this.currentUser.name || 'Người dùng', 'Chỉnh sửa kế hoạch hỗ trợ', 'support_plan', id);
       this.notify();
+      this.syncAllToSupabase();
     }
   }
 
@@ -3404,6 +3409,7 @@ class AppStateService {
     this.saveLocalState();
     this.addAuditLog(this.currentUser.name || 'Người dùng', 'Xóa kế hoạch hỗ trợ', 'support_plan', id);
     this.notify();
+    this.syncAllToSupabase();
   }
 
   // --- Tasks ---
@@ -3753,12 +3759,31 @@ class AppStateService {
           .on('postgres_changes', { event: '*', schema: 'public', table: 'groups' }, () => {
             this.fetchFromSupabase(true);
           })
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'positive_notes' }, () => {
+            this.fetchFromSupabase(true);
+          })
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'audit_logs' }, () => {
+            this.fetchFromSupabase(true);
+          })
           .on('postgres_changes', { event: '*', schema: 'public', table: 'seats' }, () => {
             if (!this.isSupabaseSyncing) {
               this.fetchFromSupabase(true);
             }
           })
           .subscribe();
+      }
+
+      // 2b. Lắng nghe sự kiện chuyển tab hoặc focus trình duyệt để tự động tải lại dữ liệu mới nhất từ Cloud
+      if (typeof window !== 'undefined' && !(window as any).__vtt_focus_listener_added) {
+        (window as any).__vtt_focus_listener_added = true;
+        window.addEventListener('focus', () => {
+          this.fetchFromSupabase(true);
+        });
+        document.addEventListener('visibilitychange', () => {
+          if (document.visibilityState === 'visible') {
+            this.fetchFromSupabase(true);
+          }
+        });
       }
 
       // 3. Kích hoạt kênh giám sát sự hiện diện thời gian thực (Supabase Presence)
@@ -4017,8 +4042,10 @@ class AppStateService {
           created_at: i.created_at || new Date().toISOString(),
         }));
         const cloudIncIds = new Set(fetchedInc.map((i) => i.id));
-        const localOnlyInc = this.incidents.filter((i) => !cloudIncIds.has(i.id));
-        this.incidents = [...fetchedInc, ...localOnlyInc];
+        this.incidents = fetchedInc;
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('VTT_INCIDENTS', JSON.stringify(this.incidents));
+        }
       }
 
       // 3. Fetch Rewards
@@ -4029,7 +4056,7 @@ class AppStateService {
         .order('created_at', { ascending: false });
 
       if (!rwErr && rwData) {
-        const fetchedRw = rwData.map((r: any) => ({
+        this.rewards = rwData.map((r: any) => ({
           id: r.id,
           student_id: r.student_id,
           class_id: r.class_id,
@@ -4041,12 +4068,9 @@ class AppStateService {
           date: r.date,
           created_at: r.created_at || new Date().toISOString(),
         }));
-        const cloudRwIds = new Set(fetchedRw.map((r) => r.id));
-        const localOnlyRw = this.rewards.filter((r) => !cloudRwIds.has(r.id));
-        this.rewards = fetchedRw.map((cloudR) => {
-          const localR = this.rewards.find((r) => r.id === cloudR.id);
-          return localR ? { ...cloudR, ...localR } : cloudR;
-        }).concat(localOnlyRw);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('VTT_REWARDS', JSON.stringify(this.rewards));
+        }
       }
 
       // 4. Fetch Attendance
@@ -4057,7 +4081,7 @@ class AppStateService {
         .order('date', { ascending: false });
 
       if (!attErr && attData) {
-        const fetchedAtt = attData.map((a: any) => ({
+        this.attendance = attData.map((a: any) => ({
           id: a.id,
           student_id: a.student_id,
           class_id: a.class_id,
@@ -4068,9 +4092,9 @@ class AppStateService {
           reason: a.reason || undefined,
           is_legitimate_exception: Boolean(a.is_legitimate_exception),
         }));
-        const cloudAttIds = new Set(fetchedAtt.map((a) => a.id));
-        const localOnlyAtt = this.attendance.filter((a) => !cloudAttIds.has(a.id));
-        this.attendance = [...fetchedAtt, ...localOnlyAtt];
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('VTT_ATTENDANCE', JSON.stringify(this.attendance));
+        }
       }
 
       // 4b. Fetch Positive Notes directly from Supabase 'positive_notes'
@@ -4081,8 +4105,8 @@ class AppStateService {
           .eq('class_id', 'class-10a16')
           .order('created_at', { ascending: false });
 
-        if (!pnErr && pnData && pnData.length > 0) {
-          const fetchedPn: PositiveNote[] = pnData.map((n: any) => ({
+        if (!pnErr && pnData) {
+          this.positiveNotes = pnData.map((n: any) => ({
             id: n.id,
             student_id: n.student_id,
             class_id: n.class_id,
@@ -4092,9 +4116,6 @@ class AppStateService {
             category: n.category || 'general',
             created_at: n.created_at || new Date().toISOString(),
           }));
-          const cloudPnIds = new Set(fetchedPn.map((n) => n.id));
-          const localOnlyPn = this.positiveNotes.filter((n) => !cloudPnIds.has(n.id));
-          this.positiveNotes = [...fetchedPn, ...localOnlyPn];
           if (typeof window !== 'undefined') {
             localStorage.setItem('VTT_POSITIVE_NOTES', JSON.stringify(this.positiveNotes));
           }
@@ -4186,36 +4207,15 @@ class AppStateService {
                 }
               }
               if (parsed.qualitativeComments && Array.isArray(parsed.qualitativeComments) && parsed.qualitativeComments.length > 0) {
-                const cloudQcIds = new Set(parsed.qualitativeComments.map((c: any) => c.id));
-                const localOnlyQc = this.qualitativeComments.filter((c) => !cloudQcIds.has(c.id));
-                this.qualitativeComments = parsed.qualitativeComments.map((cloudC: any) => {
-                  const localC = this.qualitativeComments.find((c) => c.id === cloudC.id);
-                  return localC ? { ...cloudC, ...localC } : cloudC;
-                }).concat(localOnlyQc);
+                this.qualitativeComments = parsed.qualitativeComments;
                 if (typeof window !== 'undefined') {
                   localStorage.setItem('VTT_QUALITATIVE_COMMENTS', JSON.stringify(this.qualitativeComments));
                 }
               }
               if (parsed.supportPlans && Array.isArray(parsed.supportPlans) && parsed.supportPlans.length > 0) {
-                const cloudSpIds = new Set(parsed.supportPlans.map((p: any) => p.id));
-                const localOnlySp = this.supportPlans.filter((p) => !cloudSpIds.has(p.id));
-                this.supportPlans = parsed.supportPlans.map((cloudP: any) => {
-                  const localP = this.supportPlans.find((p) => p.id === cloudP.id);
-                  return localP ? { ...cloudP, ...localP } : cloudP;
-                }).concat(localOnlySp);
+                this.supportPlans = parsed.supportPlans;
                 if (typeof window !== 'undefined') {
                   localStorage.setItem('VTT_SUPPORT_PLANS', JSON.stringify(this.supportPlans));
-                }
-              }
-              if (parsed.positiveNotes && Array.isArray(parsed.positiveNotes) && parsed.positiveNotes.length > 0) {
-                const cloudPnIds = new Set(parsed.positiveNotes.map((n: any) => n.id));
-                const localOnlyPn = this.positiveNotes.filter((n) => !cloudPnIds.has(n.id));
-                this.positiveNotes = parsed.positiveNotes.map((cloudN: any) => {
-                  const localN = this.positiveNotes.find((n) => n.id === cloudN.id);
-                  return localN ? { ...cloudN, ...localN } : cloudN;
-                }).concat(localOnlyPn);
-                if (typeof window !== 'undefined') {
-                  localStorage.setItem('VTT_POSITIVE_NOTES', JSON.stringify(this.positiveNotes));
                 }
               }
             } catch (parseE) {}
