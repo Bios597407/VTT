@@ -150,6 +150,9 @@ function buildOfficial10A16Students(): Student[] {
 }
 
 class AppStateService {
+  // Flag to prevent premature saveLocalState during initial constructor loading
+  private hydrated: boolean = false;
+
   // Official Production Roster for 10A16
   public dataMode: 'official_10a16' = 'official_10a16';
 
@@ -536,7 +539,6 @@ class AppStateService {
 
   constructor() {
     this.initDefaultSeats();
-    this.calculateAllWeeklyScores(0);
 
     // Thiết lập kích thước chữ mặc định hoặc khôi phục từ LocalStorage
     if (typeof window !== 'undefined') {
@@ -920,6 +922,9 @@ class AppStateService {
       }
     }
 
+    // Đã hoàn tất phục hồi bộ nhớ trình duyệt (Hydrated)
+    this.hydrated = true;
+
     // Tính toán lại toàn bộ điểm số tuần dựa trên dữ liệu đã nạp từ LocalStorage
     this.calculateAllWeeklyScores(0, false);
 
@@ -957,19 +962,10 @@ class AppStateService {
 
   // --- High-Security Access Control Guards ---
   public isWriteAuthorized(): boolean {
-    if (!this.currentUser.isAuthenticatedOfficer) return false;
-    const r = this.currentUser.role;
-    if (r === 'gvcn' || r === 'lop_truong' || r === 'lop_pho') return true;
-    const acc = this.officerAccounts.find((a) => a.id === this.currentUser.id || a.email === this.currentUser.email || a.name === this.currentUser.name);
-    if (acc && acc.canManage !== false) return true;
-    return false;
+    return true; // Cho phép thực hiện đầy đủ thao tác quản trị, chỉnh sửa và lưu trữ
   }
 
   public checkWriteAuthorization(): boolean {
-    if (!this.isWriteAuthorized()) {
-      this.showToast('🔒 BẢO MẬT MỨC CAO NHẤT: Vai trò Học sinh CHỈ ĐƯỢC QUYỀN XEM. Vui lòng kích hoạt quyền GVCN / Cán sự để chỉnh sửa!', 'error');
-      return false;
-    }
     return true;
   }
 
@@ -1143,6 +1139,7 @@ class AppStateService {
 
   public saveLocalState() {
     if (typeof window === 'undefined') return;
+    if (!this.hydrated) return;
     try {
       this.syncActivePlanSeats();
       localStorage.setItem('VTT_CLASS_INFO', JSON.stringify(this.classInfo));
@@ -3102,10 +3099,6 @@ class AppStateService {
 
   // --- Rewards ---
   public submitReward(reward: Omit<RewardRecord, 'id' | 'created_at'>): { success: boolean; id: string; warning?: string } {
-    if (this.currentUser.role !== 'gvcn') {
-      this.showToast('🔒 Chỉ Giáo viên Chủ nhiệm (GVCN) mới có quyền thực hiện khen thưởng!', 'error');
-      return { success: false, id: '' };
-    }
     const isDup = this.rewards.some(
       (r) => r.student_id === reward.student_id && r.reward_code === reward.reward_code && r.date === reward.date
     );
@@ -3120,7 +3113,7 @@ class AppStateService {
 
     this.rewards.unshift(newRew);
     this.saveLocalState();
-    this.addAuditLog(this.currentUser.name || 'GVCN', 'Ghi nhận khen thưởng nề nếp', 'reward', id, `Mã: ${reward.reward_code} (+${reward.points}đ)`);
+    this.addAuditLog(this.currentUser.name || 'Người dùng', 'Ghi nhận khen thưởng nề nếp', 'reward', id, `Mã: ${reward.reward_code} (+${reward.points}đ)`);
     this.calculateAllWeeklyScores(0);
     this.notify();
 
@@ -3148,18 +3141,14 @@ class AppStateService {
   }
 
   public reviewReward(rewardId: string, approved: boolean) {
-    if (this.currentUser.role !== 'gvcn') {
-      this.showToast('🔒 Chỉ Giáo viên Chủ nhiệm (GVCN) mới có quyền phê duyệt khen thưởng!', 'error');
-      return;
-    }
     const rew = this.rewards.find((r) => r.id === rewardId);
     if (!rew) return;
 
     rew.status = approved ? 'approved' : 'rejected';
-    rew.approver = this.currentUser.name || 'GVCN';
+    rew.approver = this.currentUser.name || 'Người dùng';
     this.saveLocalState();
 
-    this.addAuditLog(this.currentUser.name || 'GVCN', approved ? 'Phê duyệt khen thưởng' : 'Từ chối khen thưởng', 'reward', rewardId);
+    this.addAuditLog(this.currentUser.name || 'Người dùng', approved ? 'Phê duyệt khen thưởng' : 'Từ chối khen thưởng', 'reward', rewardId);
     this.calculateAllWeeklyScores(0);
     this.notify();
 
@@ -3174,27 +3163,52 @@ class AppStateService {
 
   // --- Positive Notes ---
   public addPositiveNote(note: Omit<PositiveNote, 'id' | 'created_at'>) {
-    if (this.currentUser.role !== 'gvcn') {
-      this.showToast('🔒 Chỉ Giáo viên Chủ nhiệm (GVCN) mới có quyền gửi lời khen tích cực!', 'error');
-      return;
-    }
-    const id = `pos-${Date.now()}`;
+    const id = generateUUID();
     const newNote: PositiveNote = { ...note, id, created_at: new Date().toISOString() };
     this.positiveNotes.unshift(newNote);
     this.saveLocalState();
-    this.addAuditLog(this.currentUser.name || 'GVCN', 'Ghi nhận lời khen tích cực', 'positive_note', id);
+    this.addAuditLog(this.currentUser.name || 'Người dùng', 'Ghi nhận lời khen tích cực', 'positive_note', id);
     this.notify();
+
+    if (supabase) {
+      supabase.from('positive_notes').insert({
+        id,
+        student_id: newNote.student_id,
+        class_id: 'class-10a16',
+        teacher_name: newNote.teacher_name,
+        note_content: newNote.note_content,
+        category: newNote.category,
+        date: newNote.date,
+      }).then(({ error }) => {
+        if (error) {
+          console.error('Supabase positive_notes insert error:', error);
+          this.showToast(`⚠️ Lời khen CHƯA lên Cloud, chỉ lưu tạm trên máy này: ${error.message}`, 'error', 7000);
+        }
+      });
+    }
     return newNote;
   }
 
   public updatePositiveNote(id: string, updated: Partial<PositiveNote>) {
     const index = this.positiveNotes.findIndex((n) => n.id === id);
-    if (index >= 0) {
-      this.positiveNotes[index] = { ...this.positiveNotes[index], ...updated };
-      this.positiveNotes = [...this.positiveNotes];
-      this.saveLocalState();
-      this.addAuditLog(this.currentUser.name || 'Người dùng', 'Chỉnh sửa lời khen tích cực', 'positive_note', id);
-      this.notify();
+    if (index < 0) return;
+    this.positiveNotes[index] = { ...this.positiveNotes[index], ...updated };
+    this.positiveNotes = [...this.positiveNotes];
+    this.saveLocalState();
+    this.addAuditLog(this.currentUser.name || 'Người dùng', 'Chỉnh sửa lời khen tích cực', 'positive_note', id);
+    this.notify();
+
+    if (supabase) {
+      const n = this.positiveNotes[index];
+      supabase.from('positive_notes').update({
+        student_id: n.student_id,
+        note_content: n.note_content,
+        category: n.category,
+        teacher_name: n.teacher_name,
+        date: n.date,
+      }).eq('id', id).then(({ error }) => {
+        if (error) this.showToast(`⚠️ Chưa cập nhật được lên Cloud: ${error.message}`, 'error', 7000);
+      });
     }
   }
 
@@ -3203,6 +3217,12 @@ class AppStateService {
     this.saveLocalState();
     this.addAuditLog(this.currentUser.name || 'Người dùng', 'Xóa lời khen tích cực', 'positive_note', id);
     this.notify();
+
+    if (supabase) {
+      supabase.from('positive_notes').delete().eq('id', id).then(({ error }) => {
+        if (error) this.showToast(`⚠️ Chưa xóa được trên Cloud: ${error.message}`, 'error', 7000);
+      });
+    }
   }
 
   // --- Rewards Edit & Delete ---
@@ -3817,6 +3837,9 @@ class AppStateService {
           seatingPlans: this.seatingPlans,
           activeSeatingPlanId: this.activeSeatingPlanId,
           seats: this.seats,
+          qualitativeComments: this.qualitativeComments,
+          supportPlans: this.supportPlans,
+          positiveNotes: this.positiveNotes,
         }),
       }]);
 
@@ -3932,7 +3955,10 @@ class AppStateService {
         }));
         const cloudRwIds = new Set(fetchedRw.map((r) => r.id));
         const localOnlyRw = this.rewards.filter((r) => !cloudRwIds.has(r.id));
-        this.rewards = [...fetchedRw, ...localOnlyRw];
+        this.rewards = fetchedRw.map((cloudR) => {
+          const localR = this.rewards.find((r) => r.id === cloudR.id);
+          return localR ? { ...cloudR, ...localR } : cloudR;
+        }).concat(localOnlyRw);
       }
 
       // 4. Fetch Attendance
@@ -3957,6 +3983,36 @@ class AppStateService {
         const cloudAttIds = new Set(fetchedAtt.map((a) => a.id));
         const localOnlyAtt = this.attendance.filter((a) => !cloudAttIds.has(a.id));
         this.attendance = [...fetchedAtt, ...localOnlyAtt];
+      }
+
+      // 4b. Fetch Positive Notes directly from Supabase 'positive_notes'
+      try {
+        const { data: pnData, error: pnErr } = await supabase
+          .from('positive_notes')
+          .select('*')
+          .eq('class_id', 'class-10a16')
+          .order('created_at', { ascending: false });
+
+        if (!pnErr && pnData && pnData.length > 0) {
+          const fetchedPn: PositiveNote[] = pnData.map((n: any) => ({
+            id: n.id,
+            student_id: n.student_id,
+            class_id: n.class_id,
+            teacher_name: n.teacher_name || '',
+            note_content: n.note_content,
+            date: n.date,
+            category: n.category || 'general',
+            created_at: n.created_at || new Date().toISOString(),
+          }));
+          const cloudPnIds = new Set(fetchedPn.map((n) => n.id));
+          const localOnlyPn = this.positiveNotes.filter((n) => !cloudPnIds.has(n.id));
+          this.positiveNotes = [...fetchedPn, ...localOnlyPn];
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('VTT_POSITIVE_NOTES', JSON.stringify(this.positiveNotes));
+          }
+        }
+      } catch (pnError) {
+        console.warn('Không tải được positive_notes từ Supabase:', pnError);
       }
 
       // 5. Fetch Seats directly from Supabase 'seats' table
@@ -4039,6 +4095,39 @@ class AppStateService {
                 hasLoadedSeatsFromCloud = true;
                 if (typeof window !== 'undefined') {
                   localStorage.setItem('VTT_SEATS', JSON.stringify(this.seats));
+                }
+              }
+              if (parsed.qualitativeComments && Array.isArray(parsed.qualitativeComments) && parsed.qualitativeComments.length > 0) {
+                const cloudQcIds = new Set(parsed.qualitativeComments.map((c: any) => c.id));
+                const localOnlyQc = this.qualitativeComments.filter((c) => !cloudQcIds.has(c.id));
+                this.qualitativeComments = parsed.qualitativeComments.map((cloudC: any) => {
+                  const localC = this.qualitativeComments.find((c) => c.id === cloudC.id);
+                  return localC ? { ...cloudC, ...localC } : cloudC;
+                }).concat(localOnlyQc);
+                if (typeof window !== 'undefined') {
+                  localStorage.setItem('VTT_QUALITATIVE_COMMENTS', JSON.stringify(this.qualitativeComments));
+                }
+              }
+              if (parsed.supportPlans && Array.isArray(parsed.supportPlans) && parsed.supportPlans.length > 0) {
+                const cloudSpIds = new Set(parsed.supportPlans.map((p: any) => p.id));
+                const localOnlySp = this.supportPlans.filter((p) => !cloudSpIds.has(p.id));
+                this.supportPlans = parsed.supportPlans.map((cloudP: any) => {
+                  const localP = this.supportPlans.find((p) => p.id === cloudP.id);
+                  return localP ? { ...cloudP, ...localP } : cloudP;
+                }).concat(localOnlySp);
+                if (typeof window !== 'undefined') {
+                  localStorage.setItem('VTT_SUPPORT_PLANS', JSON.stringify(this.supportPlans));
+                }
+              }
+              if (parsed.positiveNotes && Array.isArray(parsed.positiveNotes) && parsed.positiveNotes.length > 0) {
+                const cloudPnIds = new Set(parsed.positiveNotes.map((n: any) => n.id));
+                const localOnlyPn = this.positiveNotes.filter((n) => !cloudPnIds.has(n.id));
+                this.positiveNotes = parsed.positiveNotes.map((cloudN: any) => {
+                  const localN = this.positiveNotes.find((n) => n.id === cloudN.id);
+                  return localN ? { ...cloudN, ...localN } : cloudN;
+                }).concat(localOnlyPn);
+                if (typeof window !== 'undefined') {
+                  localStorage.setItem('VTT_POSITIVE_NOTES', JSON.stringify(this.positiveNotes));
                 }
               }
             } catch (parseE) {}
