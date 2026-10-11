@@ -3344,6 +3344,23 @@ class AppStateService {
     this.saveLocalState();
     this.addAuditLog(this.currentUser.name || 'Người dùng', 'Thêm nhận xét định tính', 'qualitative_comment', id);
     this.notify();
+
+    if (supabase) {
+      supabase.from('qualitative_comments').insert({
+        id,
+        student_id: newComment.studentId,
+        class_id: 'class-10a16',
+        author: newComment.author,
+        author_role: newComment.authorRole || 'gvcn',
+        category: newComment.category,
+        content: newComment.content,
+        date: newComment.date,
+      }).then(({ error }) => {
+        if (error) {
+          console.error('Supabase qualitative_comments insert error:', error);
+        }
+      });
+    }
     this.syncAllToSupabase();
     return newComment;
   }
@@ -3360,6 +3377,20 @@ class AppStateService {
       this.saveLocalState();
       this.addAuditLog(this.currentUser.name || 'Người dùng', 'Chỉnh sửa nhận xét định tính', 'qualitative_comment', id);
       this.notify();
+
+      if (supabase) {
+        const c = this.qualitativeComments[index];
+        supabase.from('qualitative_comments').update({
+          student_id: c.studentId,
+          author: c.author,
+          author_role: c.authorRole,
+          category: c.category,
+          content: c.content,
+          date: c.date,
+        }).eq('id', id).then(({ error }) => {
+          if (error) console.error('Supabase qualitative_comments update error:', error);
+        });
+      }
       this.syncAllToSupabase();
     }
   }
@@ -3373,6 +3404,12 @@ class AppStateService {
     this.saveLocalState();
     this.addAuditLog(this.currentUser.name || 'Người dùng', 'Xóa nhận xét định tính', 'qualitative_comment', id);
     this.notify();
+
+    if (supabase) {
+      supabase.from('qualitative_comments').delete().eq('id', id).then(({ error }) => {
+        if (error) console.error('Supabase qualitative_comments delete error:', error);
+      });
+    }
     this.syncAllToSupabase();
   }
 
@@ -3388,6 +3425,21 @@ class AppStateService {
     this.saveLocalState();
     this.addAuditLog(this.currentUser.name || 'Người dùng', 'Thêm kế hoạch hỗ trợ sư phạm', 'support_plan', id);
     this.notify();
+
+    if (supabase) {
+      supabase.from('support_plans').insert({
+        id,
+        student_id: newPlan.studentId,
+        class_id: 'class-10a16',
+        objective: newPlan.objective,
+        plan: newPlan.plan,
+        status: newPlan.status,
+        teacher_name: newPlan.teacher_name || this.currentUser.name,
+        date: newPlan.date,
+      }).then(({ error }) => {
+        if (error) console.error('Supabase support_plans insert error:', error);
+      });
+    }
     this.syncAllToSupabase();
     return newPlan;
   }
@@ -3404,6 +3456,20 @@ class AppStateService {
       this.saveLocalState();
       this.addAuditLog(this.currentUser.name || 'Người dùng', 'Chỉnh sửa kế hoạch hỗ trợ', 'support_plan', id);
       this.notify();
+
+      if (supabase) {
+        const p = this.supportPlans[index];
+        supabase.from('support_plans').update({
+          student_id: p.studentId,
+          objective: p.objective,
+          plan: p.plan,
+          status: p.status,
+          teacher_name: p.teacher_name,
+          date: p.date,
+        }).eq('id', id).then(({ error }) => {
+          if (error) console.error('Supabase support_plans update error:', error);
+        });
+      }
       this.syncAllToSupabase();
     }
   }
@@ -3417,6 +3483,12 @@ class AppStateService {
     this.saveLocalState();
     this.addAuditLog(this.currentUser.name || 'Người dùng', 'Xóa kế hoạch hỗ trợ', 'support_plan', id);
     this.notify();
+
+    if (supabase) {
+      supabase.from('support_plans').delete().eq('id', id).then(({ error }) => {
+        if (error) console.error('Supabase support_plans delete error:', error);
+      });
+    }
     this.syncAllToSupabase();
   }
 
@@ -3770,6 +3842,12 @@ class AppStateService {
           .on('postgres_changes', { event: '*', schema: 'public', table: 'positive_notes' }, () => {
             this.fetchFromSupabase(true);
           })
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'qualitative_comments' }, () => {
+            this.fetchFromSupabase(true);
+          })
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'support_plans' }, () => {
+            this.fetchFromSupabase(true);
+          })
           .on('postgres_changes', { event: '*', schema: 'public', table: 'audit_logs' }, () => {
             this.fetchFromSupabase(true);
           })
@@ -3942,6 +4020,36 @@ class AppStateService {
           is_legitimate_exception: Boolean(a.is_legitimate_exception),
         }));
         await supabase.from('attendance_records').upsert(attendancePayload, { onConflict: 'student_id,date,session_id' });
+      }
+
+      // 6b. Qualitative Comments
+      if (this.qualitativeComments.length > 0) {
+        const qcPayload = this.qualitativeComments.map((c) => ({
+          id: c.id,
+          student_id: c.studentId,
+          class_id: 'class-10a16',
+          author: c.author,
+          author_role: c.authorRole || 'gvcn',
+          category: c.category,
+          content: c.content,
+          date: c.date,
+        }));
+        await supabase.from('qualitative_comments').upsert(qcPayload, { onConflict: 'id' });
+      }
+
+      // 6c. Support Plans
+      if (this.supportPlans.length > 0) {
+        const spPayload = this.supportPlans.map((p) => ({
+          id: p.id,
+          student_id: p.studentId,
+          class_id: 'class-10a16',
+          objective: p.objective,
+          plan: p.plan,
+          status: p.status,
+          teacher_name: p.teacher_name || this.currentUser.name,
+          date: p.date,
+        }));
+        await supabase.from('support_plans').upsert(spPayload, { onConflict: 'id' });
       }
 
       // 7. Sync Seating Plans & Class Info Snapshot to Supabase Audit Log
@@ -4132,6 +4240,64 @@ class AppStateService {
         console.warn('Không tải được positive_notes từ Supabase:', pnError);
       }
 
+      // 4c. Fetch Qualitative Comments directly from Supabase 'qualitative_comments'
+      let hasLoadedQcFromCloud = false;
+      try {
+        const { data: qcData, error: qcErr } = await supabase
+          .from('qualitative_comments')
+          .select('*')
+          .eq('class_id', 'class-10a16')
+          .order('created_at', { ascending: false });
+
+        if (!qcErr && qcData) {
+          this.qualitativeComments = qcData.map((c: any) => ({
+            id: c.id,
+            studentId: c.student_id,
+            author: c.author || '',
+            authorRole: c.author_role || 'gvcn',
+            category: c.category || 'teacher',
+            content: c.content,
+            date: c.date,
+            created_at: c.created_at || new Date().toISOString(),
+          }));
+          hasLoadedQcFromCloud = true;
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('VTT_QUALITATIVE_COMMENTS', JSON.stringify(this.qualitativeComments));
+          }
+        }
+      } catch (qcError) {
+        console.warn('Không tải được qualitative_comments từ Supabase:', qcError);
+      }
+
+      // 4d. Fetch Support Plans directly from Supabase 'support_plans'
+      let hasLoadedSpFromCloud = false;
+      try {
+        const { data: spData, error: spErr } = await supabase
+          .from('support_plans')
+          .select('*')
+          .eq('class_id', 'class-10a16')
+          .order('created_at', { ascending: false });
+
+        if (!spErr && spData) {
+          this.supportPlans = spData.map((p: any) => ({
+            id: p.id,
+            studentId: p.student_id,
+            objective: p.objective,
+            plan: p.plan,
+            status: p.status,
+            teacher_name: p.teacher_name || '',
+            date: p.date,
+            created_at: p.created_at || new Date().toISOString(),
+          }));
+          hasLoadedSpFromCloud = true;
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('VTT_SUPPORT_PLANS', JSON.stringify(this.supportPlans));
+          }
+        }
+      } catch (spError) {
+        console.warn('Không tải được support_plans từ Supabase:', spError);
+      }
+
       // 5. Fetch Seats directly from Supabase 'seats' table
       let hasLoadedSeatsFromCloud = false;
       try {
@@ -4214,13 +4380,13 @@ class AppStateService {
                   localStorage.setItem('VTT_SEATS', JSON.stringify(this.seats));
                 }
               }
-              if (parsed.qualitativeComments && Array.isArray(parsed.qualitativeComments) && parsed.qualitativeComments.length > 0) {
+              if (!hasLoadedQcFromCloud && parsed.qualitativeComments && Array.isArray(parsed.qualitativeComments)) {
                 this.qualitativeComments = parsed.qualitativeComments;
                 if (typeof window !== 'undefined') {
                   localStorage.setItem('VTT_QUALITATIVE_COMMENTS', JSON.stringify(this.qualitativeComments));
                 }
               }
-              if (parsed.supportPlans && Array.isArray(parsed.supportPlans) && parsed.supportPlans.length > 0) {
+              if (!hasLoadedSpFromCloud && parsed.supportPlans && Array.isArray(parsed.supportPlans)) {
                 this.supportPlans = parsed.supportPlans;
                 if (typeof window !== 'undefined') {
                   localStorage.setItem('VTT_SUPPORT_PLANS', JSON.stringify(this.supportPlans));
