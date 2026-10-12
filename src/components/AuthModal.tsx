@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { appState } from '../services/appStateService';
+import { signIn } from '../services/authService';
 import {
   ShieldCheck,
   Mail,
@@ -26,11 +27,13 @@ export const AuthModal: React.FC<Props> = ({ isOpen, onClose, promptMessage, onS
   const currentUser = appState.currentUser;
   const classInfo = appState.classInfo;
 
-  // Primary Login Tab: 'pin' (khuyên dùng nhanh & bảo mật) | 'gmail'
-  const [activeLoginTab, setActiveLoginTab] = useState<'pin' | 'gmail'>('pin');
+  // Primary Login Tab: 'gmail' (Tài khoản Email & Mật khẩu Supabase)
+  const [activeLoginTab, setActiveLoginTab] = useState<'pin' | 'gmail'>('gmail');
 
-  // Gmail form state
+  // Gmail / Supabase Auth form state
   const [gmailInput, setGmailInput] = useState('');
+  const [passwordInput, setPasswordInput] = useState('');
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   // PIN form state
   const officerAccounts = appState.officerAccounts;
@@ -45,18 +48,42 @@ export const AuthModal: React.FC<Props> = ({ isOpen, onClose, promptMessage, onS
 
   if (!isOpen) return null;
 
-  const handleVerifyGmail = (e: React.FormEvent) => {
+  const handleVerifyGmail = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
     setRestrictionNotice(null);
 
-    const clean = gmailInput.trim().toLowerCase();
-    if (!clean) {
-      setErrorMessage('Vui lòng nhập địa chỉ Gmail.');
+    const cleanEmail = gmailInput.trim().toLowerCase();
+    if (!cleanEmail) {
+      setErrorMessage('Vui lòng nhập địa chỉ Email/Gmail.');
       return;
     }
 
-    const res = appState.authenticateWithGmail(clean);
+    // Attempt Supabase Auth login if password is provided
+    if (passwordInput.trim()) {
+      setIsLoggingIn(true);
+      try {
+        const res = await signIn(cleanEmail, passwordInput);
+        setIsLoggingIn(false);
+        if (res.ok) {
+          appState.setLoggedInProfile(res.profile);
+          appState.showToast(`Đã đăng nhập thành công với tài khoản ${res.profile.display_name || res.profile.email}`, 'success');
+          if (onSuccess) onSuccess();
+          onClose();
+          return;
+        } else {
+          setErrorMessage(res.message);
+          return;
+        }
+      } catch (err: any) {
+        setIsLoggingIn(false);
+        setErrorMessage(err?.message || 'Lỗi đăng nhập hệ thống.');
+        return;
+      }
+    }
+
+    // Fallback to Whitelist verification if no password provided
+    const res = appState.authenticateWithGmail(cleanEmail);
     if (res.success) {
       if (onSuccess) onSuccess();
       onClose();
@@ -312,12 +339,12 @@ export const AuthModal: React.FC<Props> = ({ isOpen, onClose, promptMessage, onS
             </form>
           )}
 
-          {/* TAB 2: GMAIL AUTHENTICATION (KHÔNG LỘ BẤT KỲ EMAIL HAY THÔNG TIN CÁ NHÂN NÀO) */}
+          {/* TAB 2: GMAIL / SUPABASE AUTHENTICATION */}
           {activeLoginTab === 'gmail' && (
             <form onSubmit={handleVerifyGmail} className="space-y-4 pt-1">
               <div>
                 <label className="block font-bold text-slate-900 text-sm mb-2">
-                  Nhập địa chỉ Gmail để kiểm soát quyền:
+                  Nhập địa chỉ Email/Gmail cán bộ:
                 </label>
                 <div className="relative">
                   <Mail className="w-5 h-5 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -331,17 +358,34 @@ export const AuthModal: React.FC<Props> = ({ isOpen, onClose, promptMessage, onS
                     className="w-full pl-11 pr-4 py-3.5 border-2 rounded-xl border-slate-300 font-mono text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:outline-hidden bg-white text-slate-900"
                   />
                 </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-900 text-sm mb-2">
+                  Mật khẩu tài khoản (nếu đăng nhập theo tài khoản Lớp):
+                </label>
+                <div className="relative">
+                  <KeyRound className="w-5 h-5 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="password"
+                    placeholder="Nhập mật khẩu (đối với tài khoản đã cấp quyền)..."
+                    value={passwordInput}
+                    onChange={(e) => setPasswordInput(e.target.value)}
+                    className="w-full pl-11 pr-4 py-3.5 border-2 rounded-xl border-slate-300 font-mono text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:outline-hidden bg-white text-slate-900"
+                  />
+                </div>
                 <p className="text-xs text-slate-500 mt-1.5">
-                  Hệ thống tự động đối chiếu danh sách cán sự được GVCN cấp phép để kích hoạt quyền.
+                  Nhập mật khẩu để xác thực tài khoản qua Supabase Auth, hoặc để trống để xác thực nhanh theo danh sách Gmail đã cấp quyền.
                 </p>
               </div>
 
               <button
                 type="submit"
-                className="w-full py-3.5 bg-blue-600 hover:bg-blue-500 text-white font-black text-base rounded-xl shadow-md shadow-blue-600/20 transition active:scale-95 cursor-pointer flex items-center justify-center gap-2"
+                disabled={isLoggingIn}
+                className="w-full py-3.5 bg-blue-600 hover:bg-blue-500 disabled:bg-blue-400 text-white font-black text-base rounded-xl shadow-md shadow-blue-600/20 transition active:scale-95 cursor-pointer flex items-center justify-center gap-2"
               >
                 <CheckCircle2 className="w-5 h-5" />
-                <span>Xác thực Phân quyền Gmail</span>
+                <span>{isLoggingIn ? 'Đang xác thực...' : 'Đăng nhập & Xác thực Phân quyền'}</span>
               </button>
             </form>
           )}

@@ -46,11 +46,13 @@ export function App() {
   const [pendingTabAfterAuth, setPendingTabAfterAuth] = useState<NavTab | null>(null);
   const [authPromptMessage, setAuthPromptMessage] = useState<string | null>(null);
 
-  // Subscribe to appState updates for reactivity & Auto-fetch Supabase Cloud data
+  // Subscribe to appState updates for reactivity
   const [, setTick] = useState(0);
   useEffect(() => {
-    appState.initSupabaseData();
-    return appState.subscribe(() => setTick((t) => t + 1));
+    const unsubscribeAppState = appState.subscribe(() => setTick((t) => t + 1));
+    return () => {
+      unsubscribeAppState();
+    };
   }, []);
 
   const pendingIncidentsCount = appState.incidents.filter((i) => i.incident_status === 'pending_verification').length;

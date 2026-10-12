@@ -53,7 +53,7 @@ export const SettingsPage: React.FC = () => {
   const [newTitle, setNewTitle] = useState('Lớp phó Kỷ luật & Nề nếp');
   const [newName, setNewName] = useState('');
   const [newEmail, setNewEmail] = useState('');
-  const [newPin, setNewPin] = useState('10A16lpkl');
+  const [newPin, setNewPin] = useState('***');
   const [newDuties, setNewDuties] = useState('Quản lý vi phạm, theo dõi điểm danh & chấm điểm nề nếp tuần');
   const [newBadge, setNewBadge] = useState('Ban Cán Sự');
 
@@ -63,37 +63,37 @@ export const SettingsPage: React.FC = () => {
       setNewRole('lop_truong');
       setNewTitle('Lớp trưởng');
       setNewDuties('Điều hành chung toàn lớp, đại diện tập thể, tổng hợp báo cáo GVCN');
-      setNewPin('10A16lt');
+      setNewPin('***');
       setNewBadge('Ban Cán Sự');
     } else if (val === 'lop_pho_kyluat') {
       setNewRole('lop_pho');
       setNewTitle('Lớp phó Kỷ luật & Nề nếp');
       setNewDuties('Quản lý vi phạm, theo dõi điểm danh & chấm điểm nề nếp tuần');
-      setNewPin('10A16lpkl');
+      setNewPin('***');
       setNewBadge('Ban Cán Sự');
     } else if (val === 'lop_pho_hoctap') {
       setNewRole('lop_pho');
       setNewTitle('Lớp phó Học tập');
       setNewDuties('Theo dõi học vụ, sổ đầu bài, đôn đốc các môn học');
-      setNewPin('10A16lpht');
+      setNewPin('***');
       setNewBadge('Học vụ');
     } else if (val === 'secretary') {
       setNewRole('lop_pho');
       setNewTitle('Bí thư Chi đoàn');
       setNewDuties('Phong trào Đoàn thanh niên, công tác thanh niên & hoạt động phong trào');
-      setNewPin('10A16bt');
+      setNewPin('***');
       setNewBadge('Đoàn TN');
     } else if (val === 'lop_pho_generic') {
       setNewRole('lop_pho');
       setNewTitle('Lớp phó / Cán sự');
       setNewDuties('');
-      setNewPin('10A16cs');
+      setNewPin('***');
       setNewBadge('Ban Cán Sự');
     } else if (val === 'gvcn') {
       setNewRole('gvcn');
       setNewTitle('Giáo viên Chủ nhiệm');
       setNewDuties('Chỉ đạo toàn diện nề nếp & giáo dục toàn lớp');
-      setNewPin('1016');
+      setNewPin('***');
       setNewBadge('Toàn quyền');
     }
   };
@@ -127,7 +127,7 @@ export const SettingsPage: React.FC = () => {
       title: newTitle.trim() || (newRole === 'gvcn' ? 'Giáo viên Chủ nhiệm' : newRole === 'lop_truong' ? 'Lớp trưởng' : 'Lớp phó Kỷ luật & Nề nếp'),
       name: newName.trim(),
       email: newEmail.trim().toLowerCase(),
-      pin: newPin.trim() || '10A16cs',
+      pin: '***',
       duties: newDuties.trim() || 'Thực hiện nhiệm vụ theo phân công của GVCN',
       badge: newBadge.trim() || 'Ban Cán Sự',
       canManage: true,
@@ -145,7 +145,7 @@ export const SettingsPage: React.FC = () => {
     setEditTitle(acc.title);
     setEditRole(acc.role as any);
     setEditEmail(acc.email || '');
-    setEditPin(acc.pin);
+    setEditPin('***');
     setEditDuties(acc.duties || '');
     setEditBadge(acc.badge || 'Ban Cán Sự');
   };
@@ -157,7 +157,7 @@ export const SettingsPage: React.FC = () => {
       title: editTitle.trim(),
       role: editRole,
       email: editEmail.trim().toLowerCase(),
-      pin: editPin.trim() || '1016',
+      pin: '***',
       duties: editDuties.trim(),
       badge: editBadge.trim() || 'Ban Cán Sự',
     });

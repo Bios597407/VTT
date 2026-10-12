@@ -35,6 +35,7 @@ import {
 } from '../domain/scoring/scoringEngine';
 import { OFFICIAL_CONDUCT_CATALOG, ConductCatalogItem, formatIncidentDeductionRationale } from '../domain/incidents/conductCatalog';
 import { isSupabaseConfigured, supabase } from '../lib/supabaseClient';
+import { AppProfile, signOut } from '../lib/authService';
 
 function generateUUID(): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -172,10 +173,10 @@ class AppStateService {
     });
   }
 
-  // Current logged in user (Mặc định: Chế độ Học sinh / Khách xem, muốn thao tác phải xác thực)
+  // Current logged in user (Mặc định: Chưa đăng nhập, cần đăng nhập qua LoginGate)
   public currentUser: CurrentUser = {
-    id: 'user-guest',
-    name: 'Học sinh / Khách xem',
+    id: 'anonymous',
+    name: 'Chưa đăng nhập',
     role: 'hoc_sinh',
     class_id: 'class-10a16',
     isAuthenticatedOfficer: false,
@@ -207,7 +208,7 @@ class AppStateService {
       title: 'Giáo viên Chủ nhiệm',
       name: 'Thầy Trần Duy Tân',
       email: '',
-      pin: '1016',
+      pin: '***',
       duties: 'Chỉ đạo toàn diện nề nếp & giáo dục toàn lớp',
       badge: 'Toàn quyền',
       canManage: true,
@@ -219,7 +220,7 @@ class AppStateService {
       name: 'Hoàng Trọng Minh',
       student_id: '10A16-23',
       email: '',
-      pin: '10A16lt',
+      pin: '***',
       duties: 'Điều hành chung toàn lớp, đại diện tập thể, tổng hợp báo cáo GVCN',
       badge: 'Ban Cán Sự',
       canManage: true,
@@ -231,7 +232,7 @@ class AppStateService {
       name: 'Nguyễn Gia Bảo',
       student_id: '10A16-03',
       email: '',
-      pin: '10A16lpkl',
+      pin: '***',
       duties: 'Quản lý vi phạm, theo dõi điểm danh & chấm điểm nề nếp tuần',
       badge: 'Ban Cán Sự',
       canManage: true,
@@ -243,7 +244,7 @@ class AppStateService {
       name: 'Nguyễn Ngọc Gia Hân',
       student_id: '10A16-12',
       email: '',
-      pin: '10A16lpht',
+      pin: '***',
       duties: 'Theo dõi học vụ, sổ đầu bài, đôn đốc các môn học',
       badge: 'Học vụ',
       canManage: true,
@@ -255,7 +256,7 @@ class AppStateService {
       name: 'Lưu Ngọc Linh',
       student_id: '10A16-20',
       email: '',
-      pin: '10A16bt',
+      pin: '***',
       duties: 'Phong trào Đoàn thanh niên, công tác thanh niên & hoạt động phong trào',
       badge: 'Đoàn TN',
       canManage: true,
@@ -324,47 +325,11 @@ class AppStateService {
     } catch (e) {}
   }
 
-  public changeOfficerPin(accountId: string, oldPin: string, newPin: string): { success: boolean; message: string } {
-    const acc = this.officerAccounts.find((a) => a.id === accountId);
-    if (!acc) return { success: false, message: 'Không tìm thấy tài khoản cán sự.' };
-
-    const officialPins: Record<string, string> = {
-      'acc-gvcn-user': '1016',
-      'acc-lt-truong': '10A16lt',
-      'acc-lp-kyluat': '10A16lpkl',
-      'acc-lp-hoctap': '10A16lpht',
-      'acc-bt-chidoan': '10A16bt',
+  public changeOfficerPin(_accountId: string, _oldPin: string, _newPin: string): { success: boolean; message: string } {
+    return {
+      success: false,
+      message: 'Phương thức xác thực qua PIN đã bị gỡ bỏ khỏi hệ thống.',
     };
-
-    const isMatch = (acc.pin === oldPin.trim()) || (officialPins[acc.id] === oldPin.trim());
-    if (!isMatch) {
-      return { success: false, message: 'Mã PIN hiện tại không chính xác!' };
-    }
-
-    if (newPin.trim().length < 4) {
-      return { success: false, message: 'Mã PIN mới phải từ 4 ký tự trở lên.' };
-    }
-
-    acc.pin = newPin.trim();
-    this.saveLocalState();
-    if (supabase) {
-      supabase.from('audit_logs').insert([{
-        actor_name: this.currentUser.name,
-        actor_role: this.currentUser.role,
-        action: 'CHANGE_PIN',
-        entity_type: 'officer_auth',
-        entity_id: acc.id,
-        reason: JSON.stringify({
-          officerAccounts: this.sanitizeOfficerAccounts(this.officerAccounts),
-          changedAt: new Date().toISOString(),
-        }),
-      }]).then();
-    }
-
-    this.addAuditLog(this.currentUser.name, `Đổi mã PIN bảo mật cho ${acc.title}`, 'security', acc.id, 'Người dùng chủ động thay đổi mã PIN');
-    this.showToast(`🔑 Đã cập nhật thành công mã PIN mới cho ${acc.title}!`, 'success');
-    this.notify();
-    return { success: true, message: 'Đổi mã PIN thành công!' };
   }
 
   public clearFailedAttempts(role: string) {
@@ -667,7 +632,7 @@ class AppStateService {
                 name: 'Hoàng Trọng Minh',
                 student_id: '10A16-23',
                 email: '',
-                pin: '10A16lt',
+                pin: '***',
                 duties: 'Điều hành chung toàn lớp, đại diện tập thể, tổng hợp báo cáo GVCN',
                 badge: 'Ban Cán Sự',
                 canManage: true,
@@ -681,7 +646,7 @@ class AppStateService {
                 name: 'Nguyễn Gia Bảo',
                 student_id: '10A16-03',
                 email: '',
-                pin: '10A16lpkl',
+                pin: '***',
                 duties: 'Quản lý vi phạm, theo dõi điểm danh & chấm điểm nề nếp tuần',
                 badge: 'Ban Cán Sự',
                 canManage: true,
@@ -959,22 +924,15 @@ class AppStateService {
     // Tính toán lại toàn bộ điểm số tuần dựa trên dữ liệu đã nạp từ LocalStorage
     this.calculateAllWeeklyScores(0, false);
 
-    // MẶC ĐỊNH: Chế độ Học sinh (Chỉ xem). Cần xác thực PIN/Gmail để kích hoạt quyền GVCN / Ban Cán Sự
+    // Không có phiên đăng nhập hợp lệ thì không có quyền gì.
+    // Vai trò chỉ được đặt bởi applyProfile() / setLoggedInProfile() sau khi đăng nhập thật.
+    // Dọn dữ liệu quyền/PIN cũ còn sót trong trình duyệt:
     if (typeof window !== 'undefined') {
       try {
-        const savedRole = localStorage.getItem('VTT_CURRENT_ROLE');
-        if (savedRole === 'gvcn') {
-          this.setLoggedInRole('gvcn');
-        } else if (savedRole === 'lop_truong' || savedRole === 'lop_pho') {
-          this.setLoggedInRole(savedRole as RoleType);
-        } else {
-          this.setLoggedInRole('hoc_sinh');
-        }
-      } catch (e) {
-        this.setLoggedInRole('hoc_sinh');
-      }
-    } else {
-      this.setLoggedInRole('hoc_sinh');
+        ['VTT_CURRENT_ROLE', 'VTT_OFFICER_SESSION', 'VTT_STUDENT_SESSION', 'VTT_OFFICER_ACCOUNTS'].forEach((k) =>
+          localStorage.removeItem(k)
+        );
+      } catch (e) {}
     }
     this.startSessionTracking();
   }
@@ -993,15 +951,13 @@ class AppStateService {
 
   // --- High-Security Access Control Guards ---
   public isWriteAuthorized(): boolean {
-    return this.currentUser.isAuthenticatedOfficer === true && this.currentUser.role !== 'hoc_sinh';
+    return this.currentUser.isAuthenticatedOfficer === true;
   }
 
   public checkWriteAuthorization(): boolean {
-    if (!this.isWriteAuthorized()) {
-      this.showToast('Chỉ Ban Cán Sự hoặc Giáo viên Chủ nhiệm mới có quyền thực hiện thao tác này!', 'warn');
-      return false;
-    }
-    return true;
+    if (this.currentUser.isAuthenticatedOfficer) return true;
+    this.showToast('Tài khoản của bạn không có quyền thực hiện thao tác này.', 'error');
+    return false;
   }
 
   public syncActivePlanSeats() {
@@ -1121,7 +1077,7 @@ class AppStateService {
           name: 'Hoàng Trọng Minh',
           student_id: '10A16-23',
           email: '',
-          pin: '10A16lt',
+          pin: '***',
           duties: 'Điều hành chung toàn lớp, đại diện tập thể, tổng hợp báo cáo GVCN',
           badge: 'Ban Cán Sự',
           canManage: true,
@@ -1135,7 +1091,7 @@ class AppStateService {
           name: 'Nguyễn Gia Bảo',
           student_id: '10A16-03',
           email: '',
-          pin: '10A16lpkl',
+          pin: '***',
           duties: 'Quản lý vi phạm, theo dõi điểm danh & chấm điểm nề nếp tuần',
           badge: 'Ban Cán Sự',
           canManage: true,
@@ -1149,7 +1105,7 @@ class AppStateService {
           name: 'Nguyễn Ngọc Gia Hân',
           student_id: '10A16-12',
           email: '',
-          pin: '10A16lpht',
+          pin: '***',
           duties: 'Theo dõi học vụ, sổ đầu bài, đôn đốc các môn học',
           badge: 'Học vụ',
           canManage: true,
@@ -1163,7 +1119,7 @@ class AppStateService {
           name: 'Lưu Ngọc Linh',
           student_id: '10A16-20',
           email: '',
-          pin: '10A16bt',
+          pin: '***',
           duties: 'Phong trào Đoàn thanh niên, công tác thanh niên & hoạt động phong trào',
           badge: 'Đoàn TN',
           canManage: true,
@@ -1291,7 +1247,6 @@ class AppStateService {
       exported_at: new Date().toISOString(),
       exported_by: this.currentUser.name,
       classInfo: this.classInfo,
-      officerAccounts: this.officerAccounts,
       groups: this.groups,
       students: this.students,
       incidents: this.incidents,
@@ -1412,104 +1367,53 @@ class AppStateService {
    * GVCN, Lớp trưởng, Lớp phó.
    */
   public canManageConduct(): boolean {
-    const r = this.currentUser.role;
-    return r === 'gvcn' || r === 'lop_truong' || r === 'lop_pho';
+    return this.currentUser.isAuthenticatedOfficer === true;
   }
 
-  public setLoggedInRole(role: RoleType, studentId?: string, groupId?: string) {
-    if (role === 'gvcn') {
-      const gvcnAcc = this.officerAccounts.find((a) => a.role === 'gvcn');
-      this.currentUser = {
-        id: 'user-gvcn',
-        name: `${this.classInfo.gvcn_name || gvcnAcc?.name || 'Thầy Trần Duy Tân'} (GVCN)`,
-        role: 'gvcn',
-        class_id: 'class-10a16',
-        email: this.classInfo.gvcn_email || gvcnAcc?.email,
-        isAuthenticatedOfficer: true,
-      };
-    } else if (role === 'lop_truong') {
-      const ltAcc = this.officerAccounts.find((a) => a.id === 'acc-lt-truong' || a.role === 'lop_truong' || a.title?.includes('Lớp trưởng'));
-      const ltName = this.classInfo.class_president_name || ltAcc?.name || 'Hoàng Trọng Minh';
-      const studentLt = this.students.find((s) => s.full_name === ltName) || this.students.find((s) => s.id === '10A16-23');
-      this.currentUser = {
-        id: 'user-lt',
-        name: `${ltName} (${ltAcc?.title || 'Lớp trưởng'})`,
-        role: 'lop_truong',
-        class_id: 'class-10a16',
-        student_id: studentLt?.id,
-        email: ltAcc?.email,
-        isAuthenticatedOfficer: true,
-      };
-    } else if (role === 'lop_pho') {
-      const lpAcc = this.officerAccounts.find((a) => a.id === 'acc-lp-kyluat' || a.title?.includes('Kỷ luật') || a.role === 'lop_pho');
-      const lpName = this.classInfo.class_vice_discipline_name || lpAcc?.name || 'Nguyễn Gia Bảo';
-      const studentLp = this.students.find((s) => s.full_name === lpName) || this.students.find((s) => s.id === '10A16-03');
-      this.currentUser = {
-        id: 'user-lp',
-        name: `${lpName} (${lpAcc?.title || 'Lớp phó Kỷ luật & Nề nếp'})`,
-        role: 'lop_pho',
-        class_id: 'class-10a16',
-        student_id: studentLp?.id,
-        email: lpAcc?.email,
-        isAuthenticatedOfficer: true,
-      };
-    } else if (role === 'to_truong') {
-      const studentTt = this.students[2];
-      this.currentUser = {
-        id: 'user-tt',
-        name: `${studentTt?.full_name || 'Tổ trưởng'} (Tổ trưởng Tổ 1)`,
-        role: 'to_truong',
-        class_id: 'class-10a16',
-        student_id: studentTt?.id,
-        group_id: 'group-01',
-        isAuthenticatedOfficer: false,
-      };
-    } else {
-      const targetStudent = studentId ? this.students.find((s) => s.id === studentId) : this.students[3];
-      this.currentUser = {
-        id: `user-${targetStudent?.id || 'stu'}`,
-        name: targetStudent ? `${targetStudent.full_name} (Học sinh)` : 'Học sinh Lớp 10A16 (Chỉ xem)',
-        role: 'hoc_sinh',
-        class_id: 'class-10a16',
-        student_id: targetStudent?.id,
-        isAuthenticatedOfficer: false,
-      };
-    }
-    if (typeof window !== 'undefined') {
-      try {
-        localStorage.setItem('VTT_CURRENT_ROLE', role);
-      } catch (e) {}
-    }
-    this.updateSessionHeartbeat();
-    this.saveLocalState();
-    this.notify();
+  public setLoggedInRole(_role: RoleType, _studentId?: string, _groupId?: string) {
+    console.warn('Đã gỡ: vai trò lấy từ tài khoản đăng nhập, không đổi thủ công.');
   }
 
-  public setLoggedInOfficer(officerId: string) {
-    const acc = this.officerAccounts.find((a) => a.id === officerId);
-    if (!acc) return;
-    const stu = acc.student_id ? this.students.find((s) => s.id === acc.student_id) : this.students.find((s) => s.full_name === acc.name);
-    this.currentUser = {
-      id: `user-${acc.id}`,
-      name: `${acc.name} (${acc.title})`,
-      role: (acc.role as RoleType) || 'lop_pho',
-      class_id: 'class-10a16',
-      student_id: stu?.id,
-      email: acc.email,
-      isAuthenticatedOfficer: true,
+  public setLoggedInOfficer(_officerId: string) {
+    console.warn('Đã gỡ: vai trò lấy từ tài khoản đăng nhập.');
+  }
+
+  public setLoggedInProfile(profile: AppProfile) {
+    const roleMap: Record<string, RoleType> = {
+      gvcn: 'gvcn',
+      lop_truong: 'lop_truong',
+      lop_pho: 'lop_pho',
+      to_truong: 'to_truong',
+      hoc_sinh: 'hoc_sinh',
     };
-    if (typeof window !== 'undefined') {
-      try {
-        localStorage.setItem('VTT_CURRENT_ROLE', acc.role);
-        localStorage.setItem(
-          'VTT_OFFICER_SESSION',
-          JSON.stringify({ role: acc.role, email: acc.email, name: acc.name, officerId: acc.id, timestamp: Date.now() })
-        );
-      } catch (e) {}
-    }
+    const role = roleMap[profile.role] || 'hoc_sinh';
+    const isOfficer = role === 'gvcn' || role === 'lop_truong' || role === 'lop_pho' || profile.can_manage;
+
+    this.currentUser = {
+      id: profile.user_id,
+      name: profile.display_name || profile.email || 'Người dùng',
+      role,
+      class_id: 'class-10a16',
+      student_id: profile.student_id || undefined,
+      email: profile.email,
+      isAuthenticatedOfficer: isOfficer,
+    };
+
     this.updateSessionHeartbeat();
     this.saveLocalState();
     this.notify();
+  }
+
+  public async startAuthenticatedSession(profile: AppProfile) {
+    this.setLoggedInProfile(profile);
+    await this.initSupabaseData();
+  }
+
+  public wipeLocalCacheIfSynced() {
+    try {
+      localStorage.removeItem('VTT_CURRENT_ROLE');
+      localStorage.removeItem('VTT_CLASS_STATE');
+    } catch (e) {}
   }
 
   // --- Class Management & Settings (GVCN toàn quyền thay đổi không hạn chế) ---
@@ -1843,122 +1747,17 @@ class AppStateService {
     }
   }
 
-  public authenticateWithPin(accountOrRoleId: string, pinInput: string): { success: boolean; account?: OfficerAccount; message: string } {
-    const cleanPin = pinInput.trim();
-    const found = this.officerAccounts.find((a) => a.id === accountOrRoleId)
-      || this.officerAccounts.find((a) => a.role === accountOrRoleId)
-      || this.officerAccounts.find((a) => a.title.toLowerCase() === accountOrRoleId.toLowerCase());
-
-    if (!found) {
-      return { success: false, message: 'Không tìm thấy vai trò cán bộ này trong hệ thống.' };
-    }
-
-    const lockKey = found.id;
-    const remainingSecs = this.getLockoutRemainingSeconds(lockKey);
-    if (remainingSecs > 0) {
-      return {
-        success: false,
-        message: `⛔ TÀI KHOẢN TẠM KHÓA: Nhập sai PIN quá 5 lần. Vui lòng thử lại sau ${remainingSecs} giây để bảo vệ an toàn hệ thống!`,
-      };
-    }
-
-    // Mã PIN chuẩn mặc định của Ban Cán Sự
-    const officialPins: Record<string, string> = {
-      'acc-gvcn-user': '1016',
-      'acc-lt-truong': '10A16lt',
-      'acc-lp-kyluat': '10A16lpkl',
-      'acc-lp-hoctap': '10A16lpht',
-      'acc-lt': '10A16lpht',
-      'acc-bt-chidoan': '10A16bt',
-      'acc-lp': '10A16bt',
-      gvcn: '1016',
-      lop_truong: '10A16lt',
-      lop_pho: '10A16lpkl',
-    };
-
-    const isMatch = (found.pin && found.pin === cleanPin) 
-      || (officialPins[found.id] === cleanPin) 
-      || (officialPins[found.role] === cleanPin);
-
-    if (!isMatch) {
-      const attempts = (this.failedPinAttempts[lockKey] || 0) + 1;
-      this.failedPinAttempts[lockKey] = attempts;
-
-      if (attempts >= 5) {
-        // Lock out for 3 minutes (180s)
-        this.lockoutUntil[lockKey] = Date.now() + 180 * 1000;
-        this.saveLockoutState();
-        this.addAuditLog('Hệ thống Bảo mật', `CẢNH BÁO: Phát hiện dò PIN sai ${attempts} lần liên tiếp cho ${found.title}. Đã kích hoạt Khóa Tạm Thời 3 phút!`, 'security_alert', found.id);
-        this.notify();
-        return {
-          success: false,
-          message: `⛔ BẢO VỆ CHỐNG DÒ PIN: Nhập sai 5 lần! Vai trò ${found.title} tạm thời bị khóa trong 3 phút.`,
-        };
-      }
-
-      this.saveLockoutState();
-      this.addAuditLog('Hệ thống Bảo mật', `Nhập sai mã PIN lần thứ ${attempts}/5 cho ${found.title}`, 'auth_failed', found.id);
-      return {
-        success: false,
-        message: `Mã PIN không chính xác (Lần ${attempts}/5). Nhập sai 5 lần sẽ tạm khóa 3 phút!`,
-      };
-    }
-
-    // Reset failed attempts on success
-    this.clearFailedAttempts(lockKey);
-
-    // Tự động sửa lỗi dữ liệu cũ (Self-healing): Nếu mã PIN trong bộ nhớ khác mã PIN chuẩn mà người dùng nhập đúng
-    if (found.pin !== cleanPin) {
-      found.pin = cleanPin;
-      if (typeof window !== 'undefined') {
-        try {
-          localStorage.setItem('VTT_OFFICER_ACCOUNTS', JSON.stringify(this.officerAccounts));
-        } catch (e) {}
-      }
-    }
-
-    this.setLoggedInOfficer(found.id);
-    this.currentUser.isAuthenticatedOfficer = true;
-    if (typeof window !== 'undefined') {
-      try {
-        localStorage.setItem(
-          'VTT_OFFICER_SESSION',
-          JSON.stringify({ role: found.role, email: found.email, name: found.name, officerId: found.id, timestamp: Date.now() })
-        );
-      } catch (e) {}
-    }
-    this.addAuditLog(found.name, `Xác thực thành công qua Mã PIN bảo mật cho chức danh [${found.title}]`, 'auth', found.id);
-    this.showToast(`Xác thực thành công! Đã kích hoạt toàn quyền cho ${found.title} (${found.name}).`, 'success');
-    this.notify();
-
+  public authenticateWithPin(_accountOrRoleId: string, _pinInput: string): { success: boolean; account?: OfficerAccount; message: string } {
     return {
-      success: true,
-      account: found,
-      message: `Xác thực thành công! Kích hoạt toàn quyền điều chỉnh cho ${found.title}.`,
+      success: false,
+      message: 'Phương thức xác thực qua PIN đã bị gỡ bỏ để bảo đảm an toàn. Vui lòng đăng nhập bằng Email và Mật khẩu.',
     };
   }
 
-  public logoutToStudentMode() {
-    this.syncActivePlanSeats();
+  public async logoutToStudentMode() {
     this.saveLocalState();
-    // VĨNH VIỄN LƯU LÊN SUPABASE CLOUD TRƯỚC KHI THOÁT QUYỀN (ƯU TIÊN CAO NHẤT)
-    this.syncSeatingToSupabase().then();
-    this.syncAllToSupabase().then();
-
-    if (typeof window !== 'undefined') {
-      try {
-        localStorage.removeItem('VTT_OFFICER_SESSION');
-        localStorage.removeItem('VTT_STUDENT_SESSION');
-        localStorage.removeItem('VTT_CURRENT_ROLE');
-      } catch (e) {}
-    }
-    this.setLoggedInRole('hoc_sinh');
-    this.currentUser.email = undefined;
-    this.currentUser.isAuthenticatedOfficer = false;
-    this.updateSessionHeartbeat();
-    this.addAuditLog(this.currentUser.name, 'Đăng xuất khỏi quyền cán sự (Khóa về chế độ Học sinh)', 'auth', 'logout');
-    this.showToast('Đã đăng xuất! Hệ thống đã khóa về Chế độ Học sinh (Chỉ xem). Sơ đồ chỗ ngồi và mọi dữ liệu được lưu vĩnh viễn 100% ở mức ưu tiên cao nhất.', 'info');
-    this.notify();
+    try { await this.syncAllToSupabase(); } catch (e) {}
+    await signOut();
   }
 
   public resetToCleanOfficialRoster() {

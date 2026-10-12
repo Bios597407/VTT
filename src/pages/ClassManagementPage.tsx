@@ -82,13 +82,7 @@ export const ClassManagementPage: React.FC<Props> = ({ onNavigate, onOpenAuthMod
 
   const handleQuickGvcnLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    setQuickPinError('');
-    const res = appState.authenticateWithPin('gvcn', quickPinInput);
-    if (!res.success) {
-      setQuickPinError(res.message);
-    } else {
-      setQuickPinInput('');
-    }
+    setQuickPinError('Chức năng xác thực mã PIN đã bị gỡ bỏ để bảo đảm an toàn. Vui lòng sử dụng màn hình Đăng nhập bằng Email & Mật khẩu.');
   };
 
   const handleOpenEditInfo = () => {
