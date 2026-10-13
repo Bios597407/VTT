@@ -28,7 +28,8 @@ export const ReportsPage: React.FC = () => {
       selectedWeek,
       range.optionLabel,
       attendance,
-      range.fullRangeText
+      range.fullRangeText,
+      incidents
     );
     appState.showToast(`Đã tải xuống bảng điểm rèn luyện Tuần ${selectedWeek} (${range.shortRange})!`, 'success');
   };

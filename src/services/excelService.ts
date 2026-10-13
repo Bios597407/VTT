@@ -1,6 +1,7 @@
 import * as XLSX from 'xlsx';
-import { Student, WeekScoreSnapshot, AttendanceRecord, Incident, RewardRecord, ConductLevel } from '../types';
-import { formatStudentWeeklyAttendance, getWeekDateRange } from '../domain/scoring/scoringEngine';
+import { Student, WeekScoreSnapshot, AttendanceRecord, Incident, RewardRecord, ConductLevel, IncidentStatus } from '../types';
+import { formatStudentWeeklyAttendance, getWeekDateRange, getWeekNumberForDate } from '../domain/scoring/scoringEngine';
+import { OFFICIAL_CONDUCT_CATALOG } from '../domain/incidents/conductCatalog';
 
 export interface ImportStudentRow {
   stt?: number | string;
@@ -146,13 +147,41 @@ export class ExcelService {
     weekNumber: number,
     weekName?: string,
     attendance: AttendanceRecord[] = [],
-    fullRangeText?: string
+    fullRangeText?: string,
+    incidents: Incident[] = []
   ): void {
     const range = getWeekDateRange(weekNumber);
 
     const data = students.map((stu, index) => {
       const snap = snapshots.find((s) => s.student_id === stu.id);
       const attSummary = formatStudentWeeklyAttendance(stu.id, weekNumber, attendance);
+
+      // Filter approved incidents for student in this week
+      const studentWeekIncidents = incidents.filter(
+        (inc) =>
+          inc.student_id === stu.id &&
+          getWeekNumberForDate(inc.date) === weekNumber &&
+          inc.incident_status === 'approved'
+      );
+
+      const violationTexts = studentWeekIncidents.map((inc) => {
+        const rule = OFFICIAL_CONDUCT_CATALOG.find((c) => c.code === inc.conduct_code);
+        const title = rule
+          ? rule.shortTitle
+          : inc.conduct_code
+          ? `Mã ${inc.conduct_code}`
+          : 'Sự việc khác';
+        const detail = inc.other_category_description
+          ? `: ${inc.other_category_description}`
+          : inc.notes
+          ? `: ${inc.notes}`
+          : '';
+        const pts = inc.effective_deduction ? ` (${inc.effective_deduction}đ)` : '';
+        return `${title}${pts}${detail}`;
+      });
+
+      const violationSummary = violationTexts.length > 0 ? violationTexts.join('; ') : '';
+
       return {
         'STT': index + 1,
         'Mã học sinh': stu.student_code,
@@ -160,6 +189,7 @@ export class ExcelService {
         'Điểm ban đầu': 8,
         'Điểm khen thưởng (+)': snap ? snap.reward_points : 0,
         'Điểm trừ (-)': snap ? snap.deduction_points : 0,
+        'Nội dung vi phạm': violationSummary,
         'Chuyên cần': attSummary.shortText,
         'Điểm thô': snap?.raw_week_score ?? 'Chưa tính',
         'Điểm chính thức': snap?.official_week_score ?? 'Chưa tính',
@@ -218,6 +248,32 @@ export class ExcelService {
     students: Student[]
   ): void {
     const studentMap = new Map(students.map((s) => [s.id, s]));
+
+    const formatStatus = (status: string) => {
+      switch (status) {
+        case 'present':
+          return 'Có mặt';
+        case 'permitted_absence':
+        case 'excused':
+          return 'Có phép';
+        case 'unpermitted_absence':
+        case 'unexcused':
+          return 'K.phép';
+        case 'late':
+          return 'Trễ';
+        case 'truancy':
+          return 'Trốn tiết';
+        case 'absence_pending_verification':
+          return 'Chờ xác nhận';
+        case 'permitted_early_leave':
+          return 'Về sớm có phép';
+        case 'unauthorized_early_leave':
+          return 'Về sớm K.phép';
+        default:
+          return status;
+      }
+    };
+
     const data = attendance.map((att, idx) => {
       const stu = studentMap.get(att.student_id);
       return {
@@ -226,7 +282,7 @@ export class ExcelService {
         'Buổi': att.session === 'morning' ? 'Sáng' : 'Chiều',
         'Mã HS': stu?.student_code || att.student_id,
         'Họ và tên': stu?.full_name || 'N/A',
-        'Trạng thái': att.status,
+        'Trạng thái': formatStatus(att.status),
         'Giờ đến': att.arrival_time || '',
         'Lý do': att.reason || '',
         'Miễn trừ chính đáng': att.is_legitimate_exception ? 'Có' : 'Không',
@@ -249,19 +305,43 @@ export class ExcelService {
     students: Student[]
   ): void {
     const studentMap = new Map(students.map((s) => [s.id, s]));
+    const formatIncidentStatus = (status: IncidentStatus) => {
+      switch (status) {
+        case 'approved':
+          return 'Đã duyệt';
+        case 'pending_verification':
+          return 'Chờ duyệt';
+        case 'draft':
+          return 'Bản nháp';
+        case 'rejected':
+          return 'Từ chối';
+        case 'more_info_needed':
+          return 'Cần thêm thông tin';
+        default:
+          return status;
+      }
+    };
+
     const data = incidents.map((inc, idx) => {
       const stu = studentMap.get(inc.student_id);
+      const rule = OFFICIAL_CONDUCT_CATALOG.find((c) => c.code === inc.conduct_code);
+
+      const violationContent = rule
+        ? `[Mã ${rule.code}] ${rule.shortTitle}`
+        : inc.conduct_code
+        ? `Mã ${inc.conduct_code}`
+        : inc.other_category_description || 'Sự việc khác';
+
       return {
         'STT': idx + 1,
         'Ngày': inc.date,
         'Buổi': inc.session === 'morning' ? 'Sáng' : 'Chiều',
         'Mã HS': stu?.student_code || inc.student_id,
         'Họ và tên': stu?.full_name || 'N/A',
-        'Mã vi phạm': inc.conduct_code || 'Sự việc khác',
-        'Nội dung khác': inc.other_category_description || '',
-        'Trạng thái sự việc': inc.incident_status,
-        'Hiệu lực điểm': inc.score_effect_status,
-        'Điểm trừ chính thức': inc.effective_deduction,
+        'Điểm trừ': inc.effective_deduction ?? 0,
+        'Nội dung vi phạm': violationContent,
+        'Trạng thái sự việc': formatIncidentStatus(inc.incident_status),
+        'Hiệu lực điểm': inc.score_effect_status === 'confirmed_effect' ? 'Tính điểm' : 'Không tính điểm',
         'Người báo cáo': inc.reported_by,
         'Vai trò người báo': inc.reporter_role,
         'Ghi chú': inc.notes || '',
