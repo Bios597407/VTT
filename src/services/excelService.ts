@@ -1,6 +1,6 @@
 import * as XLSX from 'xlsx';
 import { Student, WeekScoreSnapshot, AttendanceRecord, Incident, RewardRecord, ConductLevel, IncidentStatus } from '../types';
-import { formatStudentWeeklyAttendance, getWeekDateRange, getWeekNumberForDate } from '../domain/scoring/scoringEngine';
+import { formatStudentWeeklyAttendance, getWeekDateRange, getWeekNumberForDate, calculateMonthlyScore } from '../domain/scoring/scoringEngine';
 import { OFFICIAL_CONDUCT_CATALOG } from '../domain/incidents/conductCatalog';
 
 export interface ImportStudentRow {
@@ -238,6 +238,87 @@ export class ExcelService {
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, semesterName);
     XLSX.writeFile(workbook, `VTT_10A16_Danh_Gia_Ren_Luyen_${semesterName}.xlsx`);
+  }
+
+  /**
+   * Export Monthly Conduct Scores to real .xlsx
+   */
+  static exportMonthlyScoreExcel(
+    students: Student[],
+    snapshots: WeekScoreSnapshot[],
+    incidents: Incident[] = []
+  ): void {
+    const data = students.map((stu, index) => {
+      const snapW1 = snapshots.find((s) => s.student_id === stu.id && s.week_number === 1 && s.is_current);
+      const m9Score = calculateMonthlyScore([snapW1?.official_week_score ?? 8]);
+
+      const stuIncidents = incidents.filter(
+        (inc) => inc.student_id === stu.id && inc.incident_status === 'approved'
+      );
+
+      const violationTexts = stuIncidents.map((inc) => {
+        const rule = OFFICIAL_CONDUCT_CATALOG.find((c) => c.code === inc.conduct_code);
+        const title = rule
+          ? rule.shortTitle
+          : inc.conduct_code
+          ? `Mã ${inc.conduct_code}`
+          : 'Sự việc khác';
+        const detail = inc.other_category_description
+          ? `: ${inc.other_category_description}`
+          : inc.notes
+          ? `: ${inc.notes}`
+          : '';
+        const pts = inc.effective_deduction ? ` (-${inc.effective_deduction}đ)` : '';
+        return `${title}${pts}${detail}`;
+      });
+
+      const violationSummary = violationTexts.length > 0 ? violationTexts.join('; ') : 'Không vi phạm';
+
+      return {
+        'STT': index + 1,
+        'Mã học sinh': stu.student_code,
+        'Họ và tên': stu.full_name,
+        'Tháng 9 (Tuần 1–4)': m9Score !== null ? Number(m9Score.toFixed(2)) : 'Chưa đủ dữ liệu',
+        'Tháng 10 (Tuần 5–8)': 'Chưa đến kỳ',
+        'Tháng 11 (Tuần 9–12)': 'Chưa đến kỳ',
+        'Tháng 12 (Tuần 13–16)': 'Chưa đến kỳ',
+        'Nội dung vi phạm': violationSummary,
+      };
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Diem_Thang');
+    XLSX.writeFile(workbook, `VTT_10A16_Diem_Ren_Luyen_Thang.xlsx`);
+  }
+
+  /**
+   * Export Annual Conduct Review to real .xlsx
+   */
+  static exportAnnualScoreExcel(
+    students: Student[],
+    snapshots: {
+      student: Student;
+      hk1Level: ConductLevel;
+      hk2Level: ConductLevel;
+      annualLevel: ConductLevel;
+      rationale: string;
+    }[]
+  ): void {
+    const data = snapshots.map((item, index) => ({
+      'STT': index + 1,
+      'Mã học sinh': item.student.student_code,
+      'Họ và tên': item.student.full_name,
+      'Xếp loại HKI': item.hk1Level,
+      'Xếp loại HKII (Dự kiến)': item.hk2Level,
+      'Kết quả Rèn luyện Cả Năm': item.annualLevel,
+      'Căn cứ quy chế': item.rationale,
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Ca_Nam');
+    XLSX.writeFile(workbook, `VTT_10A16_Danh_Gia_Ren_Luyen_Ca_Nam.xlsx`);
   }
 
   /**

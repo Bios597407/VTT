@@ -50,16 +50,47 @@ export const ScoringPage: React.FC = () => {
   const handleRecalculate = () => {
     setIsRecalculating(true);
     setTimeout(() => {
-      appState.calculateAllWeeklyScores(selectedWeek);
-      appState.addAuditLog(
-        currentUser.name,
-        `Tính lại điểm tuần W${selectedWeek} (Tạo phiên bản Revision mới)`,
-        'score_run',
-        `W${selectedWeek}`,
-        'GVCN yêu cầu tái tính toán'
-      );
+      if (periodTab === 'weekly') {
+        appState.calculateAllWeeklyScores(selectedWeek);
+        appState.addAuditLog(
+          currentUser.name,
+          `Tính lại điểm tuần W${selectedWeek} (Tạo phiên bản Revision mới)`,
+          'score_run',
+          `W${selectedWeek}`,
+          'GVCN yêu cầu tái tính toán'
+        );
+        appState.showToast(`Đã tính toán lại điểm rèn luyện Tuần ${selectedWeek} thành công!`, 'success');
+      } else if (periodTab === 'monthly') {
+        appState.calculateAllWeeklyScores(1);
+        appState.addAuditLog(
+          currentUser.name,
+          'Tính lại điểm các tháng (TB tuần)',
+          'score_run',
+          'monthly',
+          'Tái tính toán điểm tháng'
+        );
+        appState.showToast('Đã tính toán lại điểm trung bình các tháng thành công!', 'success');
+      } else if (periodTab === 'semester') {
+        appState.calculateAllWeeklyScores(1);
+        appState.addAuditLog(
+          currentUser.name,
+          'Tính lại điểm và đánh giá Học kỳ 1',
+          'score_run',
+          'semester_1',
+          'Tái tính toán điểm học kỳ'
+        );
+        appState.showToast('Đã tính toán lại đánh giá Học kỳ 1 thành công!', 'success');
+      } else if (periodTab === 'annual') {
+        appState.addAuditLog(
+          currentUser.name,
+          'Tính lại ma trận Đánh giá Cả năm (Thông tư 22)',
+          'score_run',
+          'annual',
+          'Tái tính toán kết quả cả năm'
+        );
+        appState.showToast('Đã tính toán lại kết quả Rèn luyện Cả năm thành công!', 'success');
+      }
       setIsRecalculating(false);
-      appState.showToast(`Đã tính toán lại điểm rèn luyện Tuần ${selectedWeek} thành công!`, 'success');
     }, 400);
   };
 
@@ -72,9 +103,70 @@ export const ScoringPage: React.FC = () => {
       selectedWeek,
       range.optionLabel,
       appState.attendance,
-      range.fullRangeText
+      range.fullRangeText,
+      incidents
     );
     appState.showToast(`Đã tải xuống tệp Excel Điểm Tuần ${selectedWeek} (${range.shortRange})!`, 'success');
+  };
+
+  const handleExportMonth = () => {
+    const currentSnaps = weeklySnapshots.filter((s) => s.is_current);
+    ExcelService.exportMonthlyScoreExcel(students, currentSnaps, incidents);
+    appState.showToast('Đã tải xuống tệp Excel Điểm Tháng (TB Các tuần)!', 'success');
+  };
+
+  const handleExportSemester = () => {
+    const snapshots = students.map((stu) => {
+      const snapW1 = weeklySnapshots.find((s) => s.student_id === stu.id && s.week_number === 1 && s.is_current);
+      const stuScore = snapW1?.official_week_score ?? 8.0;
+      const stuAttendance = appState.attendance.filter((a) => a.student_id === stu.id);
+      const attTally = tallyAttendance(stuAttendance);
+      const phoneViolations = incidents.filter(
+        (i) => i.student_id === stu.id && i.conduct_code === '24' && i.incident_status === 'approved'
+      ).length;
+
+      const baseLevel = determineBaseConductLevel(stuScore);
+      const restricted = applySemesterRestrictions(baseLevel, {
+        permittedAbsenceCount: attTally.totCapRelevantPermittedAbsenceCount,
+        unpermittedAbsenceCount: attTally.totCapRelevantUnpermittedAbsenceCount,
+        phoneViolationsCount: phoneViolations,
+      });
+
+      const finalized = finalizedLevels[stu.id] || (restricted.finalSuggestedLevel as ConductLevel) || 'Tốt';
+
+      return {
+        student: stu,
+        calculatedScore: stuScore,
+        suggestedLevel: (restricted.finalSuggestedLevel as ConductLevel) || 'Tốt',
+        finalizedLevel: finalized,
+        permittedAbsences: attTally.totCapRelevantPermittedAbsenceCount,
+        unpermittedAbsences: attTally.totCapRelevantUnpermittedAbsenceCount,
+        phoneViolations,
+        rationale: rationales[stu.id] || 'Theo kết quả rèn luyện',
+      };
+    });
+
+    ExcelService.exportSemesterReviewExcel(students, snapshots, 'Hoc_Ky_1');
+    appState.showToast('Đã tải xuống tệp Excel Đánh giá Học kỳ 1!', 'success');
+  };
+
+  const handleExportAnnual = () => {
+    const snapshots = students.map((stu) => {
+      const hk1Lvl = finalizedLevels[stu.id] || 'Tốt';
+      const hk2Lvl: ConductLevel = 'Tốt';
+      const annualLvl = calculateAnnualConduct(hk1Lvl, hk2Lvl);
+
+      return {
+        student: stu,
+        hk1Level: hk1Lvl,
+        hk2Level: hk2Lvl,
+        annualLevel: annualLvl,
+        rationale: `Ma trận Thông tư 22 (HK2=${hk2Lvl}, HK1=${hk1Lvl})`,
+      };
+    });
+
+    ExcelService.exportAnnualScoreExcel(students, snapshots);
+    appState.showToast('Đã tải xuống tệp Excel Đánh giá Cả năm!', 'success');
   };
 
   return (
@@ -90,24 +182,53 @@ export const ScoringPage: React.FC = () => {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={handleRecalculate}
+            disabled={isRecalculating}
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl shadow-sm transition active:scale-95 cursor-pointer disabled:bg-slate-400"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isRecalculating ? 'animate-spin' : ''}`} />
+            Tính toán lại
+          </button>
+
           {periodTab === 'weekly' && (
-            <>
-              <button
-                onClick={handleRecalculate}
-                disabled={isRecalculating}
-                className="flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl shadow-sm transition active:scale-95 cursor-pointer disabled:bg-slate-400"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 ${isRecalculating ? 'animate-spin' : ''}`} />
-                Tính toán lại
-              </button>
-              <button
-                onClick={handleExportWeek}
-                className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-sm transition active:scale-95 cursor-pointer"
-              >
-                <FileSpreadsheet className="w-3.5 h-3.5" />
-                Xuất Excel tuần
-              </button>
-            </>
+            <button
+              onClick={handleExportWeek}
+              className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-sm transition active:scale-95 cursor-pointer"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5" />
+              Xuất Excel tuần
+            </button>
+          )}
+
+          {periodTab === 'monthly' && (
+            <button
+              onClick={handleExportMonth}
+              className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-sm transition active:scale-95 cursor-pointer"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5" />
+              Xuất Excel tháng
+            </button>
+          )}
+
+          {periodTab === 'semester' && (
+            <button
+              onClick={handleExportSemester}
+              className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-sm transition active:scale-95 cursor-pointer"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5" />
+              Xuất Excel học kỳ
+            </button>
+          )}
+
+          {periodTab === 'annual' && (
+            <button
+              onClick={handleExportAnnual}
+              className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-sm transition active:scale-95 cursor-pointer"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5" />
+              Xuất Excel cả năm
+            </button>
           )}
         </div>
       </div>
@@ -320,12 +441,19 @@ export const ScoringPage: React.FC = () => {
                     <th className="py-3 px-4">Tháng 10 (Tuần 5–8)</th>
                     <th className="py-3 px-4">Tháng 11 (Tuần 9–12)</th>
                     <th className="py-3 px-4">Tháng 12 (Tuần 13–16)</th>
+                    <th className="py-3 px-4 bg-rose-50/60 text-rose-900 border-l border-rose-100">
+                      📌 Nội dung vi phạm
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {students.map((stu, idx) => {
                     const snapW1 = weeklySnapshots.find((s) => s.student_id === stu.id && s.week_number === 1 && s.is_current);
                     const m9Score = calculateMonthlyScore([snapW1?.official_week_score ?? 8]);
+
+                    const stuIncidents = incidents.filter(
+                      (i) => i.student_id === stu.id && i.incident_status === 'approved'
+                    );
 
                     return (
                       <tr key={stu.id} className="hover:bg-slate-50">
@@ -338,6 +466,19 @@ export const ScoringPage: React.FC = () => {
                         <td className="py-3 px-4 text-slate-400">Chưa đến kỳ</td>
                         <td className="py-3 px-4 text-slate-400">Chưa đến kỳ</td>
                         <td className="py-3 px-4 text-slate-400">Chưa đến kỳ</td>
+                        <td className="py-3 px-4 bg-rose-50/20 border-l border-rose-100 text-[11px]">
+                          {stuIncidents.length === 0 ? (
+                            <span className="text-emerald-700 font-semibold">✅ Không vi phạm</span>
+                          ) : (
+                            <div className="space-y-0.5">
+                              {stuIncidents.map((inc) => (
+                                <div key={inc.id} className="text-rose-900 font-semibold">
+                                  {formatIncidentDeductionRationale(inc, appState.conductCatalog)}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </td>
                       </tr>
                     );
                   })}
