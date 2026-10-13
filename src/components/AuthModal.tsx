@@ -1,19 +1,16 @@
 import React, { useState } from 'react';
 import { appState } from '../services/appStateService';
-import { signIn } from '../services/authService';
+import { signIn } from '../lib/authService';
 import {
-  ShieldCheck,
-  Mail,
-  KeyRound,
   Lock,
   LogOut,
   X,
-  CheckCircle2,
   AlertCircle,
   Eye,
   School,
   ArrowRight,
-  ShieldAlert,
+  ShieldCheck,
+  Mail,
 } from 'lucide-react';
 
 interface Props {
@@ -23,100 +20,52 @@ interface Props {
   onSuccess?: () => void;
 }
 
-export const AuthModal: React.FC<Props> = ({ isOpen, onClose, promptMessage, onSuccess }) => {
+export const AuthModal: React.FC<Props> = ({
+  isOpen,
+  onClose,
+  promptMessage,
+  onSuccess,
+}) => {
   const currentUser = appState.currentUser;
   const classInfo = appState.classInfo;
 
-  // Primary Login Tab: 'gmail' (Tài khoản Email & Mật khẩu Supabase)
-  const [activeLoginTab, setActiveLoginTab] = useState<'pin' | 'gmail'>('gmail');
-
-  // Gmail / Supabase Auth form state
-  const [gmailInput, setGmailInput] = useState('');
-  const [passwordInput, setPasswordInput] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
-
-  // PIN form state
-  const officerAccounts = appState.officerAccounts;
-  const [selectedAccountId, setSelectedAccountId] = useState<string>(
-    officerAccounts.find((a) => a.role === 'gvcn')?.id || officerAccounts[0]?.id || 'acc-gvcn-user'
-  );
-  const selectedOfficer = officerAccounts.find((a) => a.id === selectedAccountId) || officerAccounts[0];
-  const [pinInput, setPinInput] = useState('');
-
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [restrictionNotice, setRestrictionNotice] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
-  const handleVerifyGmail = async (e: React.FormEvent) => {
+  const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
-    setRestrictionNotice(null);
 
-    const cleanEmail = gmailInput.trim().toLowerCase();
-    if (!cleanEmail) {
-      setErrorMessage('Vui lòng nhập địa chỉ Email/Gmail.');
+    const cleanEmail = email.trim();
+    const cleanPassword = password.trim();
+
+    if (!cleanEmail || !cleanPassword) {
+      setErrorMessage('Email hoặc mật khẩu không đúng');
       return;
     }
 
-    // Attempt Supabase Auth login if password is provided
-    if (passwordInput.trim()) {
-      setIsLoggingIn(true);
-      try {
-        const res = await signIn(cleanEmail, passwordInput);
-        setIsLoggingIn(false);
-        if (res.ok) {
-          appState.setLoggedInProfile(res.profile);
-          appState.showToast(`Đã đăng nhập thành công với tài khoản ${res.profile.display_name || res.profile.email}`, 'success');
-          if (onSuccess) onSuccess();
-          onClose();
-          return;
-        } else {
-          setErrorMessage(res.message);
-          return;
-        }
-      } catch (err: any) {
-        setIsLoggingIn(false);
-        setErrorMessage(err?.message || 'Lỗi đăng nhập hệ thống.');
-        return;
-      }
-    }
-
-    // Fallback to Whitelist verification if no password provided
-    const res = appState.authenticateWithGmail(cleanEmail);
-    if (res.success) {
-      if (onSuccess) onSuccess();
-      onClose();
-    } else {
-      if (res.isRestricted) {
-        setRestrictionNotice(res.message);
-        setTimeout(() => {
-          if (onSuccess) onSuccess();
-          onClose();
-        }, 1800);
+    setIsLoggingIn(true);
+    try {
+      const res = await signIn(cleanEmail, cleanPassword);
+      setIsLoggingIn(false);
+      if (res.ok) {
+        appState.setLoggedInProfile(res.profile);
+        appState.showToast(
+          `Đã đăng nhập thành công (${res.profile.display_name || cleanEmail})`,
+          'success'
+        );
+        if (onSuccess) onSuccess();
+        onClose();
       } else {
-        setErrorMessage(res.message);
+        setErrorMessage('Email hoặc mật khẩu không đúng');
       }
-    }
-  };
-
-  const handleVerifyPin = (e: React.FormEvent) => {
-    e.preventDefault();
-    setErrorMessage(null);
-    setRestrictionNotice(null);
-
-    if (!pinInput.trim()) {
-      setErrorMessage('Vui lòng nhập mã PIN bảo mật.');
-      return;
-    }
-
-    const res = appState.authenticateWithPin(selectedAccountId, pinInput);
-    if (res.success) {
-      setPinInput('');
-      if (onSuccess) onSuccess();
-      onClose();
-    } else {
-      setErrorMessage(res.message);
+    } catch {
+      setIsLoggingIn(false);
+      setErrorMessage('Email hoặc mật khẩu không đúng');
     }
   };
 
@@ -135,10 +84,12 @@ export const AuthModal: React.FC<Props> = ({ isOpen, onClose, promptMessage, onS
     onClose();
   };
 
+  const isSubmitDisabled = isLoggingIn || !email.trim() || !password.trim();
+
   return (
     <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 overflow-y-auto">
       <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full overflow-hidden border border-slate-200 animate-in fade-in zoom-in duration-200 my-auto">
-        {/* Top Header - Chữ to, rõ ràng, không lộ thông tin cá nhân */}
+        {/* Top Header */}
         <div className="px-6 py-5 bg-gradient-to-r from-slate-900 via-slate-800 to-blue-950 text-white relative">
           <button
             onClick={onClose}
@@ -160,16 +111,16 @@ export const AuthModal: React.FC<Props> = ({ isOpen, onClose, promptMessage, onS
                 <span className="text-xs text-slate-300 hidden sm:inline">{classInfo.school_name}</span>
               </div>
               <h2 className="text-lg sm:text-xl font-black text-white tracking-tight mt-1">
-                Xác thực Quyền Quản trị Lớp học
+                Đăng nhập Cán sự / Quản trị
               </h2>
             </div>
           </div>
           <p className="text-sm text-slate-200 mt-2 leading-relaxed">
-            Hệ thống bảo mật nghiêm ngặt: Chỉ Giáo viên Chủ nhiệm và Ban Cán sự Lớp 10A16 mới có quyền điều chỉnh dữ liệu. Học sinh và phụ huynh ở Chế độ Chỉ xem an toàn.
+            Nhập email và mật khẩu cán sự để đăng nhập hệ thống quản lý nề nếp.
           </p>
         </div>
 
-        {/* Trạng thái hiện tại - Chữ to rõ ràng */}
+        {/* Trạng thái hiện tại */}
         <div className="px-6 py-3.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between text-sm">
           <div className="flex items-center gap-2 truncate pr-2">
             <span className="text-slate-500 shrink-0 font-medium">Hiện tại:</span>
@@ -212,16 +163,6 @@ export const AuthModal: React.FC<Props> = ({ isOpen, onClose, promptMessage, onS
             </div>
           )}
 
-          {restrictionNotice && (
-            <div className="p-4 bg-rose-50 border border-rose-300 rounded-2xl text-rose-950 text-sm flex items-start gap-3 shadow-xs animate-in fade-in duration-200">
-              <ShieldAlert className="w-6 h-6 text-rose-600 shrink-0 mt-0.5" />
-              <div>
-                <div className="font-black text-rose-950 text-base">Đã kích hoạt chế độ hạn chế quyền!</div>
-                <div className="mt-1 leading-relaxed text-sm">{restrictionNotice}</div>
-              </div>
-            </div>
-          )}
-
           {errorMessage && (
             <div className="p-3.5 bg-rose-50 border border-rose-200 text-rose-800 rounded-xl text-sm flex items-start gap-2.5">
               <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
@@ -229,166 +170,53 @@ export const AuthModal: React.FC<Props> = ({ isOpen, onClose, promptMessage, onS
             </div>
           )}
 
-          {/* Tab Switcher: PIN Cán sự vs Gmail (Chữ to, dễ nhấn) */}
-          <div className="flex border border-slate-200 rounded-2xl p-1 bg-slate-100 text-sm font-bold">
+          {/* Form Đăng nhập Email & Mật khẩu */}
+          <form onSubmit={handleSignIn} className="space-y-4 pt-1">
+            <div>
+              <label className="block font-bold text-slate-900 text-sm mb-2 flex items-center gap-1.5">
+                <Mail className="w-4 h-4 text-blue-600" />
+                <span>Địa chỉ Email:</span>
+              </label>
+              <div className="relative">
+                <Mail className="w-5 h-5 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="email"
+                  required
+                  placeholder="nhap.email@truong.edu.vn"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full pl-11 pr-4 py-3.5 border-2 rounded-xl border-slate-300 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:outline-hidden bg-white text-slate-900"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block font-bold text-slate-900 text-sm mb-2 flex items-center gap-1.5">
+                <Lock className="w-4 h-4 text-blue-600" />
+                <span>Mật khẩu:</span>
+              </label>
+              <div className="relative">
+                <Lock className="w-5 h-5 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="password"
+                  required
+                  placeholder="Nhập mật khẩu..."
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full pl-11 pr-4 py-3.5 border-2 rounded-xl border-slate-300 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:outline-hidden bg-white text-slate-900"
+                />
+              </div>
+            </div>
+
             <button
-              type="button"
-              onClick={() => {
-                setActiveLoginTab('pin');
-                setErrorMessage(null);
-                setRestrictionNotice(null);
-              }}
-              className={`flex-1 py-3 rounded-xl transition cursor-pointer flex items-center justify-center gap-2 ${
-                activeLoginTab === 'pin'
-                  ? 'bg-white text-blue-700 shadow-sm'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
+              type="submit"
+              disabled={isSubmitDisabled}
+              className="w-full py-3.5 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-300 disabled:text-slate-500 text-white font-black text-base rounded-xl shadow-md shadow-blue-600/20 transition active:scale-95 cursor-pointer disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
-              <KeyRound className="w-4 h-4 text-blue-600" />
-              <span>1. Mã PIN Cán sự (Nhanh nhất)</span>
+              <ShieldCheck className="w-5 h-5" />
+              <span>{isLoggingIn ? 'Đang đăng nhập...' : 'Đăng nhập Cán sự'}</span>
             </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                setActiveLoginTab('gmail');
-                setErrorMessage(null);
-                setRestrictionNotice(null);
-              }}
-              className={`flex-1 py-3 rounded-xl transition cursor-pointer flex items-center justify-center gap-2 ${
-                activeLoginTab === 'gmail'
-                  ? 'bg-white text-blue-700 shadow-sm'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <Mail className="w-4 h-4 text-slate-500" />
-              <span>2. Đăng nhập Gmail</span>
-            </button>
-          </div>
-
-          {/* TAB 1: PIN AUTHENTICATION (BẢO MẬT & CHỮ TO RÕ RÀNG) */}
-          {activeLoginTab === 'pin' && (
-            <form onSubmit={handleVerifyPin} className="space-y-4 pt-1">
-              <div>
-                <label className="block font-bold text-slate-900 text-sm mb-2">
-                  Chọn chức danh cán sự cần mở khóa ({officerAccounts.length} cán bộ):
-                </label>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 max-h-[220px] overflow-y-auto pr-1">
-                  {officerAccounts.map((acc) => {
-                    const isSelected = selectedAccountId === acc.id;
-                    return (
-                      <button
-                        key={acc.id}
-                        type="button"
-                        onClick={() => setSelectedAccountId(acc.id)}
-                        className={`p-3 rounded-xl text-left border transition cursor-pointer flex flex-col justify-between ${
-                          isSelected
-                            ? 'border-blue-600 bg-blue-50 text-blue-950 shadow-xs ring-2 ring-blue-500/30'
-                            : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between gap-1">
-                          <span className="font-black text-xs truncate">{acc.title}</span>
-                          <span
-                            className={`text-[9px] font-black px-1.5 py-0.5 rounded ${
-                              acc.role === 'gvcn'
-                                ? 'bg-emerald-100 text-emerald-800'
-                                : 'bg-slate-100 text-slate-700'
-                            }`}
-                          >
-                            {acc.badge || (acc.role === 'gvcn' ? 'Toàn quyền' : 'Ban Cán Sự')}
-                          </span>
-                        </div>
-                        <div className="text-xs font-bold text-slate-900 mt-1 truncate">
-                          {acc.name}
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div>
-                <label className="block font-bold text-slate-900 text-sm mb-2">
-                  Nhập Mã PIN bảo mật của {selectedOfficer ? `[${selectedOfficer.title} - ${selectedOfficer.name}]` : 'Cán sự'}:
-                </label>
-                <div className="relative">
-                  <KeyRound className="w-5 h-5 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="password"
-                    required
-                    autoFocus
-                    placeholder={selectedOfficer ? `Mã PIN của ${selectedOfficer.name}...` : 'Nhập mã PIN...'}
-                    value={pinInput}
-                    onChange={(e) => setPinInput(e.target.value)}
-                    className="w-full pl-11 pr-4 py-3.5 border-2 rounded-xl border-slate-300 font-mono text-base tracking-widest focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:outline-hidden bg-white text-slate-900"
-                  />
-                </div>
-                <p className="text-xs text-slate-500 mt-1.5">
-                  Mã PIN bảo mật nội bộ do GVCN quản lý, bảo vệ an toàn dữ liệu và quyền điều hành lớp.
-                </p>
-              </div>
-
-              <button
-                type="submit"
-                className="w-full py-3.5 bg-blue-600 hover:bg-blue-500 text-white font-black text-base rounded-xl shadow-md shadow-blue-600/20 transition active:scale-95 cursor-pointer flex items-center justify-center gap-2"
-              >
-                <CheckCircle2 className="w-5 h-5" />
-                <span>Xác nhận Mã PIN & Mở khóa Quyền</span>
-              </button>
-            </form>
-          )}
-
-          {/* TAB 2: GMAIL / SUPABASE AUTHENTICATION */}
-          {activeLoginTab === 'gmail' && (
-            <form onSubmit={handleVerifyGmail} className="space-y-4 pt-1">
-              <div>
-                <label className="block font-bold text-slate-900 text-sm mb-2">
-                  Nhập địa chỉ Email/Gmail cán bộ:
-                </label>
-                <div className="relative">
-                  <Mail className="w-5 h-5 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="email"
-                    required
-                    autoFocus
-                    placeholder="Nhập địa chỉ Gmail cán bộ hoặc giáo viên..."
-                    value={gmailInput}
-                    onChange={(e) => setGmailInput(e.target.value)}
-                    className="w-full pl-11 pr-4 py-3.5 border-2 rounded-xl border-slate-300 font-mono text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:outline-hidden bg-white text-slate-900"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block font-bold text-slate-900 text-sm mb-2">
-                  Mật khẩu tài khoản (nếu đăng nhập theo tài khoản Lớp):
-                </label>
-                <div className="relative">
-                  <KeyRound className="w-5 h-5 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="password"
-                    placeholder="Nhập mật khẩu (đối với tài khoản đã cấp quyền)..."
-                    value={passwordInput}
-                    onChange={(e) => setPasswordInput(e.target.value)}
-                    className="w-full pl-11 pr-4 py-3.5 border-2 rounded-xl border-slate-300 font-mono text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:outline-hidden bg-white text-slate-900"
-                  />
-                </div>
-                <p className="text-xs text-slate-500 mt-1.5">
-                  Nhập mật khẩu để xác thực tài khoản qua Supabase Auth, hoặc để trống để xác thực nhanh theo danh sách Gmail đã cấp quyền.
-                </p>
-              </div>
-
-              <button
-                type="submit"
-                disabled={isLoggingIn}
-                className="w-full py-3.5 bg-blue-600 hover:bg-blue-500 disabled:bg-blue-400 text-white font-black text-base rounded-xl shadow-md shadow-blue-600/20 transition active:scale-95 cursor-pointer flex items-center justify-center gap-2"
-              >
-                <CheckCircle2 className="w-5 h-5" />
-                <span>{isLoggingIn ? 'Đang xác thực...' : 'Đăng nhập & Xác thực Phân quyền'}</span>
-              </button>
-            </form>
-          )}
+          </form>
 
           {/* Nút vào xem an toàn cho Học sinh / Phụ huynh */}
           <div className="pt-2 border-t border-slate-200">
@@ -406,11 +234,11 @@ export const AuthModal: React.FC<Props> = ({ isOpen, onClose, promptMessage, onS
           </div>
         </div>
 
-        {/* Footer info - Chữ to rõ ràng */}
+        {/* Footer info */}
         <div className="px-6 py-3 bg-slate-100 border-t border-slate-200 text-xs text-slate-500 flex items-center justify-between">
           <span className="flex items-center gap-1.5">
             <Lock className="w-4 h-4 text-slate-400" />
-            Bảo mật phân quyền theo QĐ 525/QĐ-THPT.VTT
+            Bảo mật phân quyền hệ thống VTT
           </span>
           <span className="font-bold text-slate-700">Lớp 10A16</span>
         </div>

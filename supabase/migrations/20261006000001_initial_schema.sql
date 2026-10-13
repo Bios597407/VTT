@@ -416,6 +416,18 @@ CREATE TABLE parent_feedback (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE qualitative_comments (
+  id TEXT PRIMARY KEY,
+  student_id TEXT NOT NULL REFERENCES students(id) ON DELETE RESTRICT,
+  class_id TEXT NOT NULL REFERENCES classes(id) ON DELETE RESTRICT,
+  author TEXT NOT NULL,
+  author_role TEXT NOT NULL DEFAULT 'gvcn',
+  category TEXT NOT NULL DEFAULT 'teacher',
+  content TEXT NOT NULL,
+  date DATE NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 CREATE TABLE support_plans (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   student_id TEXT NOT NULL REFERENCES students(id) ON DELETE RESTRICT,

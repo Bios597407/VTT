@@ -61,6 +61,7 @@ ALTER TABLE annual_results ENABLE ROW LEVEL SECURITY;
 ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE rule_pending_confirmations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE support_plans ENABLE ROW LEVEL SECURITY;
+ALTER TABLE qualitative_comments ENABLE ROW LEVEL SECURITY;
 
 -- 1. Students Table Policy
 CREATE POLICY "GVCN and Officers can view class students"

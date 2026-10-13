@@ -98,7 +98,7 @@ export interface OfficerAccount {
   name: string;
   student_id?: string;
   email: string;
-  pin: string;
+  pin?: string;
   duties?: string;
   badge?: string;
   canManage?: boolean;
@@ -200,68 +200,8 @@ class AppStateService {
     notes: 'Toàn thể học sinh thực hiện nghiêm túc nề nếp và nội quy lớp học.',
   };
 
-  // Danh sách tài khoản Cán sự quản trị (Bảo mật, GVCN toàn quyền bổ sung & điều chỉnh chức danh tự do)
-  public officerAccounts: OfficerAccount[] = [
-    {
-      id: 'acc-gvcn-user',
-      role: 'gvcn',
-      title: 'Giáo viên Chủ nhiệm',
-      name: 'Thầy Trần Duy Tân',
-      email: '',
-      pin: '***',
-      duties: 'Chỉ đạo toàn diện nề nếp & giáo dục toàn lớp',
-      badge: 'Toàn quyền',
-      canManage: true,
-    },
-    {
-      id: 'acc-lt-truong',
-      role: 'lop_truong',
-      title: 'Lớp trưởng',
-      name: 'Hoàng Trọng Minh',
-      student_id: '10A16-23',
-      email: '',
-      pin: '***',
-      duties: 'Điều hành chung toàn lớp, đại diện tập thể, tổng hợp báo cáo GVCN',
-      badge: 'Ban Cán Sự',
-      canManage: true,
-    },
-    {
-      id: 'acc-lp-kyluat',
-      role: 'lop_pho',
-      title: 'Lớp phó Kỷ luật & Nề nếp',
-      name: 'Nguyễn Gia Bảo',
-      student_id: '10A16-03',
-      email: '',
-      pin: '***',
-      duties: 'Quản lý vi phạm, theo dõi điểm danh & chấm điểm nề nếp tuần',
-      badge: 'Ban Cán Sự',
-      canManage: true,
-    },
-    {
-      id: 'acc-lp-hoctap',
-      role: 'lop_pho',
-      title: 'Lớp phó Học tập',
-      name: 'Nguyễn Ngọc Gia Hân',
-      student_id: '10A16-12',
-      email: '',
-      pin: '***',
-      duties: 'Theo dõi học vụ, sổ đầu bài, đôn đốc các môn học',
-      badge: 'Học vụ',
-      canManage: true,
-    },
-    {
-      id: 'acc-bt-chidoan',
-      role: 'lop_pho',
-      title: 'Bí thư Chi đoàn',
-      name: 'Lưu Ngọc Linh',
-      student_id: '10A16-20',
-      email: '',
-      pin: '***',
-      duties: 'Phong trào Đoàn thanh niên, công tác thanh niên & hoạt động phong trào',
-      badge: 'Đoàn TN',
-      canManage: true,
-    },
-  ];
+  // Danh sách tài khoản Cán sự quản trị
+  public officerAccounts: OfficerAccount[] = [];
 
   // State collections - PURE REAL DATA (0 Demo records)
   public students: Student[] = buildOfficial10A16Students();
@@ -632,7 +572,6 @@ class AppStateService {
                 name: 'Hoàng Trọng Minh',
                 student_id: '10A16-23',
                 email: '',
-                pin: '***',
                 duties: 'Điều hành chung toàn lớp, đại diện tập thể, tổng hợp báo cáo GVCN',
                 badge: 'Ban Cán Sự',
                 canManage: true,
@@ -646,7 +585,6 @@ class AppStateService {
                 name: 'Nguyễn Gia Bảo',
                 student_id: '10A16-03',
                 email: '',
-                pin: '***',
                 duties: 'Quản lý vi phạm, theo dõi điểm danh & chấm điểm nề nếp tuần',
                 badge: 'Ban Cán Sự',
                 canManage: true,
@@ -1077,7 +1015,6 @@ class AppStateService {
           name: 'Hoàng Trọng Minh',
           student_id: '10A16-23',
           email: '',
-          pin: '***',
           duties: 'Điều hành chung toàn lớp, đại diện tập thể, tổng hợp báo cáo GVCN',
           badge: 'Ban Cán Sự',
           canManage: true,
@@ -1091,7 +1028,6 @@ class AppStateService {
           name: 'Nguyễn Gia Bảo',
           student_id: '10A16-03',
           email: '',
-          pin: '***',
           duties: 'Quản lý vi phạm, theo dõi điểm danh & chấm điểm nề nếp tuần',
           badge: 'Ban Cán Sự',
           canManage: true,
@@ -1105,7 +1041,6 @@ class AppStateService {
           name: 'Nguyễn Ngọc Gia Hân',
           student_id: '10A16-12',
           email: '',
-          pin: '***',
           duties: 'Theo dõi học vụ, sổ đầu bài, đôn đốc các môn học',
           badge: 'Học vụ',
           canManage: true,
@@ -1119,7 +1054,6 @@ class AppStateService {
           name: 'Lưu Ngọc Linh',
           student_id: '10A16-20',
           email: '',
-          pin: '***',
           duties: 'Phong trào Đoàn thanh niên, công tác thanh niên & hoạt động phong trào',
           badge: 'Đoàn TN',
           canManage: true,
@@ -1131,34 +1065,49 @@ class AppStateService {
   public saveLocalState() {
     if (typeof window === 'undefined') return;
     if (!this.hydrated) return;
+
+    const safeSet = (key: string, value: any) => {
+      try {
+        localStorage.setItem(key, typeof value === 'string' ? value : JSON.stringify(value));
+      } catch (e) {
+        // Tự động thu gọn dữ liệu để bảo đảm không bị QuotaExceededError
+        try {
+          if (Array.isArray(value)) {
+            const pruned = value.filter((item: any) => item && item.is_current !== false).slice(-200);
+            localStorage.setItem(key, JSON.stringify(pruned));
+          }
+        } catch (ignored) {}
+      }
+    };
+
     try {
       this.syncActivePlanSeats();
-      localStorage.setItem('VTT_CLASS_INFO', JSON.stringify(this.classInfo));
-      localStorage.setItem('VTT_OFFICER_ACCOUNTS', JSON.stringify(this.officerAccounts));
-      localStorage.setItem('VTT_GROUPS', JSON.stringify(this.groups));
-      localStorage.setItem('VTT_INCIDENTS', JSON.stringify(this.incidents));
-      localStorage.setItem('VTT_REWARDS', JSON.stringify(this.rewards));
-      localStorage.setItem('VTT_ATTENDANCE', JSON.stringify(this.attendance));
-      localStorage.setItem('VTT_STUDENTS', JSON.stringify(this.students));
-      localStorage.setItem('VTT_SEATS', JSON.stringify(this.seats));
-      localStorage.setItem('VTT_SEATING_PLANS', JSON.stringify(this.seatingPlans));
-      localStorage.setItem('VTT_ACTIVE_SEATING_PLAN_ID', this.activeSeatingPlanId);
-      localStorage.setItem('VTT_DUTY_ROSTER', JSON.stringify(this.dutyRoster));
-      localStorage.setItem('VTT_WEEKLY_DUTY_OVERRIDES', JSON.stringify(this.weeklyDutyOverrides));
-      localStorage.setItem('VTT_TASKS', JSON.stringify(this.tasks));
-      localStorage.setItem('VTT_POSITIVE_NOTES', JSON.stringify(this.positiveNotes));
-      localStorage.setItem('VTT_QUALITATIVE_COMMENTS', JSON.stringify(this.qualitativeComments));
-      localStorage.setItem('VTT_SUPPORT_PLANS', JSON.stringify(this.supportPlans));
-      localStorage.setItem('VTT_PENDING_RULES', JSON.stringify(this.pendingRules));
-      localStorage.setItem('VTT_CONDUCT_CATALOG', JSON.stringify(this.conductCatalog));
-      localStorage.setItem('VTT_WEEKLY_SNAPSHOTS', JSON.stringify(this.weeklySnapshots));
-      localStorage.setItem('VTT_MONTHLY_SNAPSHOTS', JSON.stringify(this.monthlySnapshots));
-      localStorage.setItem('VTT_SEMESTER_SNAPSHOTS', JSON.stringify(this.semesterSnapshots));
-      localStorage.setItem('VTT_PERIOD_LOCKS', JSON.stringify(this.periodLocks));
-      localStorage.setItem('VTT_AUDIT_LOGS', JSON.stringify(this.auditLogs));
-      localStorage.setItem('VTT_LAST_SAVED_AT', new Date().toISOString());
+      safeSet('VTT_CLASS_INFO', this.classInfo);
+      safeSet('VTT_OFFICER_ACCOUNTS', this.officerAccounts);
+      safeSet('VTT_GROUPS', this.groups);
+      safeSet('VTT_INCIDENTS', this.incidents);
+      safeSet('VTT_REWARDS', this.rewards);
+      safeSet('VTT_ATTENDANCE', this.attendance);
+      safeSet('VTT_STUDENTS', this.students);
+      safeSet('VTT_SEATS', this.seats);
+      safeSet('VTT_SEATING_PLANS', this.seatingPlans);
+      safeSet('VTT_ACTIVE_SEATING_PLAN_ID', this.activeSeatingPlanId);
+      safeSet('VTT_DUTY_ROSTER', this.dutyRoster);
+      safeSet('VTT_WEEKLY_DUTY_OVERRIDES', this.weeklyDutyOverrides);
+      safeSet('VTT_TASKS', this.tasks);
+      safeSet('VTT_POSITIVE_NOTES', this.positiveNotes);
+      safeSet('VTT_QUALITATIVE_COMMENTS', this.qualitativeComments);
+      safeSet('VTT_SUPPORT_PLANS', this.supportPlans);
+      safeSet('VTT_PENDING_RULES', this.pendingRules);
+      safeSet('VTT_CONDUCT_CATALOG', this.conductCatalog);
+      safeSet('VTT_WEEKLY_SNAPSHOTS', this.weeklySnapshots.filter((s) => s.is_current !== false));
+      safeSet('VTT_MONTHLY_SNAPSHOTS', this.monthlySnapshots);
+      safeSet('VTT_SEMESTER_SNAPSHOTS', this.semesterSnapshots);
+      safeSet('VTT_PERIOD_LOCKS', this.periodLocks);
+      safeSet('VTT_AUDIT_LOGS', this.auditLogs.slice(0, 100));
+      safeSet('VTT_LAST_SAVED_AT', new Date().toISOString());
     } catch (e) {
-      console.warn('Lỗi lưu trạng thái vào localStorage:', e);
+      // Khối phòng vệ cấp cao
     }
   }
 
@@ -3479,7 +3428,7 @@ class AppStateService {
         });
       }
 
-      this.weeklySnapshots = [...this.weeklySnapshots.filter((s) => !(s.is_current && s.week_number === wNum)), ...newSnapshots];
+      this.weeklySnapshots = [...this.weeklySnapshots.filter((s) => s.week_number !== wNum), ...newSnapshots];
     }
 
     if (triggerNotify) {
